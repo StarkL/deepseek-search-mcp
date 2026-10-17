@@ -1,0 +1,18 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required:
+      - deepseekApiKey
+    properties:
+      deepseekApiKey:
+        type: string
+        description: "Your DeepSeek API Key (starts with sk-)"
+  commandFunction: |-
+    (config) => ({
+      command: 'node',
+      args: ['dist/index.js'],
+      env: {
+        DEEPSEEK_API_KEY: config.deepseekApiKey
+      }
+    })
