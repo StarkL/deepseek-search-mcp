@@ -55,14 +55,55 @@
 }
 ```
 
-#### 2. Cursor
+#### 2. Claude Code (Anthropic 官方终端 Agent CLI)
+只需在终端执行一行命令即可完成全局接入：
+```bash
+claude mcp add deepseek-search -e DEEPSEEK_API_KEY=sk-your-deepseek-api-key -- npx -y deepseek-search-mcp
+```
+> 或在任意项目根目录创建 `.mcp.json` 实现团队级一键共享：
+> ```json
+> {
+>   "mcpServers": {
+>     "deepseek-search": {
+>       "command": "npx",
+>       "args": ["-y", "deepseek-search-mcp"],
+>       "env": {
+>         "DEEPSEEK_API_KEY": "sk-your-deepseek-api-key"
+>       }
+>     }
+>   }
+> }
+> ```
+
+#### 3. DeepSeek Harness (`dsh` 官方 Agent 运行时)
+DeepSeek 官方的 Agent 运行时 (`dsh`) 原生支持 MCP。有两种接入方式：
+- **方式 A（Web 界面）**：启动 `dsh web` 后，打开浏览器进入 **Settings → MCP**，点击添加 stdio 服务：
+  - **Command**: `npx`
+  - **Args**: `-y deepseek-search-mcp`
+  - **Env**: `DEEPSEEK_API_KEY=sk-your-deepseek-api-key`
+- **方式 B（Profile 配置）**：在 Profile 的 patch 文件（如 `~/.dsh/profiles/default/cordis.patch.yml`）中添加插件项：
+  ```yaml
+  - id: mcp-deepseek-search
+    name: '@deepseek-ai/dsh-mcp-client'
+    config:
+      serverName: deepseek-search
+      transport: stdio
+      command: npx
+      args:
+        - '-y'
+        - 'deepseek-search-mcp'
+      env:
+        DEEPSEEK_API_KEY: !!js process.env.DEEPSEEK_API_KEY
+  ```
+
+#### 4. Cursor
 在 Cursor 设置中打开 **Features -> MCP**，点击 **+ Add New MCP Server**：
 - **Name**: `deepseek-search`
 - **Type**: `command`
 - **Command**: `npx -y deepseek-search-mcp`
 - **Environment Variables**: 添加 `DEEPSEEK_API_KEY=sk-your-deepseek-api-key`
 
-#### 3. Cline (VS Code 扩展)
+#### 5. Cline / Roo Code (VS Code 扩展)
 打开 Cline 的 MCP 设定文件 `cline_mcp_settings.json`：
 ```json
 {
@@ -78,7 +119,7 @@
 }
 ```
 
-#### 4. Windsurf
+#### 6. Windsurf
 在 `~/.codeium/windsurf/mcp_config.json` 中配置：
 ```json
 {
@@ -93,6 +134,13 @@
   }
 }
 ```
+
+#### 7. Codex / OpenCode / Goose 及通用 Agent Harness
+对于支持标准 Model Context Protocol 的任何代码智能体（Agent Harness），配置通用的 Stdio 标准指令即可：
+- **Transport**: `stdio`
+- **Executable**: `npx`
+- **Arguments**: `["-y", "deepseek-search-mcp"]`
+- **Environment Variables**: `DEEPSEEK_API_KEY=sk-your-deepseek-api-key`
 
 ---
 
