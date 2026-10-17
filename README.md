@@ -56,17 +56,23 @@
 ```
 
 #### 2. Claude Code (Anthropic 官方终端 Agent CLI)
-只需在终端执行一行命令即可完成全局接入：
+只需在终端执行一行命令即可完成接入：
 ```bash
-claude mcp add deepseek-search -e DEEPSEEK_API_KEY=sk-your-deepseek-api-key -- npx -y @starkl/deepseek-search-mcp
+# 方式 1：直接通过 GitHub 仓库运行（免安装）
+claude mcp add deepseek-search -e DEEPSEEK_API_KEY=sk-your-deepseek-api-key '--' npx -y github:StarkL/deepseek-search-mcp
+
+# 方式 2：本地源码运行（零网络延迟，推荐开发与日常使用）
+claude mcp add deepseek-search -e DEEPSEEK_API_KEY=sk-your-deepseek-api-key '--' node /absolute/path/to/deepseek-search-mcp/dist/index.js
 ```
+> 💡 **PowerShell 用户提示**：在 Windows PowerShell 中，命令中的 `'--'` 需加引号，防止被 PowerShell 识别为内部转义符。
+> 
 > 或在任意项目根目录创建 `.mcp.json` 实现团队级一键共享：
 > ```json
 > {
 >   "mcpServers": {
 >     "deepseek-search": {
 >       "command": "npx",
->       "args": ["-y", "@starkl/deepseek-search-mcp"],
+>       "args": ["-y", "github:StarkL/deepseek-search-mcp"],
 >       "env": {
 >         "DEEPSEEK_API_KEY": "sk-your-deepseek-api-key"
 >       }
