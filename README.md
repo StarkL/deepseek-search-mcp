@@ -1,6 +1,6 @@
 # DeepSeek Search MCP Server 🔍
 
-[![npm version](https://img.shields.io/npm/v/deepseek-search-mcp.svg)](https://www.npmjs.com/package/deepseek-search-mcp)
+[![npm version](https://img.shields.io/npm/v/@starkl/deepseek-search-mcp.svg)](https://www.npmjs.com/package/@starkl/deepseek-search-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![MCP Protocol](https://img.shields.io/badge/MCP-1.6.0-green.svg)](https://modelcontextprotocol.io/)
 [![DeepSeek API](https://img.shields.io/badge/API-DeepSeek%20Search%20%26%20Fetch-blueviolet)](https://api-docs.deepseek.com/zh-cn/guides/search/)
@@ -46,7 +46,7 @@
   "mcpServers": {
     "deepseek-search": {
       "command": "npx",
-      "args": ["-y", "deepseek-search-mcp"],
+      "args": ["-y", "@starkl/deepseek-search-mcp"],
       "env": {
         "DEEPSEEK_API_KEY": "sk-your-deepseek-api-key"
       }
@@ -58,7 +58,7 @@
 #### 2. Claude Code (Anthropic 官方终端 Agent CLI)
 只需在终端执行一行命令即可完成全局接入：
 ```bash
-claude mcp add deepseek-search -e DEEPSEEK_API_KEY=sk-your-deepseek-api-key -- npx -y deepseek-search-mcp
+claude mcp add deepseek-search -e DEEPSEEK_API_KEY=sk-your-deepseek-api-key -- npx -y @starkl/deepseek-search-mcp
 ```
 > 或在任意项目根目录创建 `.mcp.json` 实现团队级一键共享：
 > ```json
@@ -66,7 +66,7 @@ claude mcp add deepseek-search -e DEEPSEEK_API_KEY=sk-your-deepseek-api-key -- n
 >   "mcpServers": {
 >     "deepseek-search": {
 >       "command": "npx",
->       "args": ["-y", "deepseek-search-mcp"],
+>       "args": ["-y", "@starkl/deepseek-search-mcp"],
 >       "env": {
 >         "DEEPSEEK_API_KEY": "sk-your-deepseek-api-key"
 >       }
@@ -79,7 +79,7 @@ claude mcp add deepseek-search -e DEEPSEEK_API_KEY=sk-your-deepseek-api-key -- n
 DeepSeek 官方的 Agent 运行时 (`dsh`) 原生支持 MCP。有两种接入方式：
 - **方式 A（Web 界面）**：启动 `dsh web` 后，打开浏览器进入 **Settings → MCP**，点击添加 stdio 服务：
   - **Command**: `npx`
-  - **Args**: `-y deepseek-search-mcp`
+  - **Args**: `-y @starkl/deepseek-search-mcp`
   - **Env**: `DEEPSEEK_API_KEY=sk-your-deepseek-api-key`
 - **方式 B（Profile 配置）**：在 Profile 的 patch 文件（如 `~/.dsh/profiles/default/cordis.patch.yml`）中添加插件项：
   ```yaml
@@ -91,7 +91,7 @@ DeepSeek 官方的 Agent 运行时 (`dsh`) 原生支持 MCP。有两种接入方
       command: npx
       args:
         - '-y'
-        - 'deepseek-search-mcp'
+        - '@starkl/deepseek-search-mcp'
       env:
         DEEPSEEK_API_KEY: !!js process.env.DEEPSEEK_API_KEY
   ```
@@ -100,7 +100,7 @@ DeepSeek 官方的 Agent 运行时 (`dsh`) 原生支持 MCP。有两种接入方
 在 Cursor 设置中打开 **Features -> MCP**，点击 **+ Add New MCP Server**：
 - **Name**: `deepseek-search`
 - **Type**: `command`
-- **Command**: `npx -y deepseek-search-mcp`
+- **Command**: `npx -y @starkl/deepseek-search-mcp`
 - **Environment Variables**: 添加 `DEEPSEEK_API_KEY=sk-your-deepseek-api-key`
 
 #### 5. Cline / Roo Code (VS Code 扩展)
@@ -110,7 +110,7 @@ DeepSeek 官方的 Agent 运行时 (`dsh`) 原生支持 MCP。有两种接入方
   "mcpServers": {
     "deepseek-search": {
       "command": "npx",
-      "args": ["-y", "deepseek-search-mcp"],
+      "args": ["-y", "@starkl/deepseek-search-mcp"],
       "env": {
         "DEEPSEEK_API_KEY": "sk-your-deepseek-api-key"
       }
@@ -126,7 +126,7 @@ DeepSeek 官方的 Agent 运行时 (`dsh`) 原生支持 MCP。有两种接入方
   "mcpServers": {
     "deepseek-search": {
       "command": "npx",
-      "args": ["-y", "deepseek-search-mcp"],
+      "args": ["-y", "@starkl/deepseek-search-mcp"],
       "env": {
         "DEEPSEEK_API_KEY": "sk-your-deepseek-api-key"
       }
@@ -139,7 +139,7 @@ DeepSeek 官方的 Agent 运行时 (`dsh`) 原生支持 MCP。有两种接入方
 对于支持标准 Model Context Protocol 的任何代码智能体（Agent Harness），配置通用的 Stdio 标准指令即可：
 - **Transport**: `stdio`
 - **Executable**: `npx`
-- **Arguments**: `["-y", "deepseek-search-mcp"]`
+- **Arguments**: `["-y", "@starkl/deepseek-search-mcp"]`
 - **Environment Variables**: `DEEPSEEK_API_KEY=sk-your-deepseek-api-key`
 
 ---

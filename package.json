@@ -1,11 +1,15 @@
 {
-  "name": "deepseek-search-mcp",
+  "name": "@starkl/deepseek-search-mcp",
   "version": "1.0.0",
   "description": "Official-spec DeepSeek Search & Fetch MCP Server for AI Agents (Claude Desktop, Cursor, Cline, Windsurf, etc.)",
   "main": "dist/index.js",
   "type": "module",
   "bin": {
     "deepseek-search-mcp": "./dist/index.js"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "files": [
     "dist",
@@ -32,7 +36,7 @@
   "author": "StarkL <290930511@qq.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/StarkL/deepseek-search-mcp.git"
+    "url": "git+https://github.com/StarkL/deepseek-search-mcp.git"
   },
   "license": "MIT",
   "dependencies": {
