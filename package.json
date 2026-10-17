@@ -1,0 +1,49 @@
+{
+  "name": "deepseek-search-mcp",
+  "version": "1.0.0",
+  "description": "Official-spec DeepSeek Search & Fetch MCP Server for AI Agents (Claude Desktop, Cursor, Cline, Windsurf, etc.)",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "deepseek-search-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc -w",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "deepseek",
+    "search",
+    "fetch",
+    "web-search",
+    "claude",
+    "cursor",
+    "agent"
+  ],
+  "author": "StarkL <290930511@qq.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/StarkL/deepseek-search-mcp.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
