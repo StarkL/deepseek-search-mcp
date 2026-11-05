@@ -3,9 +3,6 @@
  * 为 DSH 聊天框下方注入类似 DeepSeek 官网的“联网搜索”交互按钮
  */
 export const name = "dsh-client-deepseek-search";
-export const inject = {
-    optional: ["slots", "toast", "api"]
-};
 const STORAGE_KEY = "dsh_deepseek_search_enabled";
 export function apply(ctx = {}) {
     // 读取上次保存的状态，默认关闭 (变暗)
@@ -103,15 +100,7 @@ export function apply(ctx = {}) {
      */
     const requestEnsureMcp = async () => {
         try {
-            // 1. 优先尝试 RPC api
-            try {
-                if (ctx?.api && typeof ctx.api.call === "function") {
-                    await ctx.api.call("deepseekSearch/ensureStarted");
-                    return true;
-                }
-            }
-            catch { }
-            // 2. 尝试 Cordis 服务直调
+            // 1. 尝试 Cordis 服务直调
             try {
                 if (ctx?.deepseekSearchService && typeof ctx.deepseekSearchService.ensureStarted === "function") {
                     await ctx.deepseekSearchService.ensureStarted();
@@ -119,7 +108,7 @@ export function apply(ctx = {}) {
                 }
             }
             catch { }
-            // 3. 尝试通用事件总线
+            // 2. 尝试通用事件总线
             if (typeof ctx?.emit === "function") {
                 await ctx.emit("deepseekSearch/ensureStarted");
                 return true;
@@ -228,10 +217,9 @@ export function apply(ctx = {}) {
             // 找到它的目标父级容器或者最邻近的操作按钮容器
             let targetParent = workspaceElem;
             while (targetParent && targetParent.parentElement) {
-                // 如果父容器包含发送按钮或者宽度足够，即为工具栏
+                // 如果父容器包含按钮且元素多于 1 个，即为操作条
                 if (targetParent.parentElement.querySelector("button") && targetParent.parentElement.children.length >= 2) {
                     const container = createButtonNode();
-                    // 插入在工作区选项按钮的紧邻右侧
                     if (targetParent.nextSibling) {
                         targetParent.parentElement.insertBefore(container, targetParent.nextSibling);
                     }
@@ -243,7 +231,7 @@ export function apply(ctx = {}) {
                 targetParent = targetParent.parentElement;
             }
         }
-        // 探测特征 2：寻找输入框底部操作栏（包含 textarea 下方第一层 row）
+        // 探测特征 2：寻找输入框底部操作栏
         const textarea = document.querySelector("textarea");
         if (textarea && textarea.parentElement) {
             const parentCard = textarea.parentElement.parentElement || textarea.parentElement;
@@ -256,7 +244,7 @@ export function apply(ctx = {}) {
     };
     // 初始执行一次
     tryMountToDom();
-    // 使用 MutationObserver 监听动态 DOM 变化（切换页面、新建会话时自动挂载）
+    // 监听动态 DOM 变化（新建会话、切换页面时自动挂载）
     if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
         const observer = new MutationObserver(() => {
             tryMountToDom();
@@ -278,7 +266,7 @@ export function apply(ctx = {}) {
         });
     }
 }
-// 兼容自执行环境
+// 兼容浏览器直接自执行
 if (typeof window !== "undefined") {
     // @ts-ignore
     if (!window.__DSH_DEEPSEEK_SEARCH_CLIENT_LOADED__) {
