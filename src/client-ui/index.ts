@@ -5,6 +5,11 @@
 
 export const name = "dsh-client-deepseek-search";
 
+// 声明前端可选服务依赖
+export const inject = {
+  optional: ["slots", "toast", "api"]
+};
+
 export function apply(ctx: any) {
   const STORAGE_KEY = "dsh_deepseek_search_enabled";
 
@@ -82,99 +87,121 @@ export function apply(ctx: any) {
   injectStyles();
 
   /**
-   * 触发后端 RPC 检查并拉起 MCP
+   * 安全显示 Toast 提示
+   */
+  const showToast = (message: string, type: "error" | "info" | "success" = "info") => {
+    try {
+      if (ctx.toast && typeof ctx.toast[type] === "function") {
+        ctx.toast[type](message);
+        return;
+      }
+    } catch {}
+    if (type === "error") {
+      alert(message);
+    }
+  };
+
+  /**
+   * 触发后端检查并拉起 MCP
    */
   const requestEnsureMcp = async (): Promise<boolean> => {
     try {
-      // 兼容通过 ctx.api 或 ctx.services 调用的形式
-      if (ctx.api && typeof ctx.api.call === "function") {
-        await ctx.api.call("deepseekSearch/ensureStarted");
+      // 1. 优先尝试 RPC api
+      try {
+        if (ctx.api && typeof ctx.api.call === "function") {
+          await ctx.api.call("deepseekSearch/ensureStarted");
+          return true;
+        }
+      } catch {}
+
+      // 2. 尝试 Cordis 服务直调
+      try {
+        if (ctx.deepseekSearchService && typeof ctx.deepseekSearchService.ensureStarted === "function") {
+          await ctx.deepseekSearchService.ensureStarted();
+          return true;
+        }
+      } catch {}
+
+      // 3. 尝试通用事件总线
+      if (typeof ctx.emit === "function") {
+        await ctx.emit("deepseekSearch/ensureStarted");
         return true;
       }
-      if (ctx.deepseekSearchService && typeof ctx.deepseekSearchService.ensureStarted === "function") {
-        await ctx.deepseekSearchService.ensureStarted();
-        return true;
-      }
-      // 如果环境处于独立无服务模式，仅作本地通知
+
       return true;
     } catch (err: any) {
       const msg = err?.message || String(err);
-      if (ctx.toast && typeof ctx.toast.error === "function") {
-        ctx.toast.error(msg);
-      } else {
-        alert(msg);
-      }
+      showToast(msg, "error");
       return false;
     }
   };
 
   /**
-   * 注册到聊天输入框下方的插槽 (conversation.input.dock / conversation.input.left)
+   * 注册到聊天输入框插槽
    */
-  if (ctx.slots && typeof ctx.slots.register === "function") {
-    ctx.slots.register("conversation.input.dock", {
-      id: "deepseek-web-search-toggle",
-      order: 15,
-      render: () => {
-        const container = document.createElement("div");
-        container.className = "dsh-search-toggle-container";
+  try {
+    const slots = ctx.slots;
+    if (slots && typeof slots.register === "function") {
+      slots.register("conversation.input.dock", {
+        id: "deepseek-web-search-toggle",
+        order: 15,
+        render: () => {
+          const container = document.createElement("div");
+          container.className = "dsh-search-toggle-container";
 
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = `dsh-search-toggle-btn ${isWebSearchActive ? "active" : ""}`;
-        btn.title = "点击切换是否启用 DeepSeek 实时网络搜索";
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = `dsh-search-toggle-btn ${isWebSearchActive ? "active" : ""}`;
+          btn.title = "点击切换是否启用 DeepSeek 实时网络搜索";
 
-        btn.innerHTML = `
-          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="2" y1="12" x2="22" y2="12"></line>
-            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-          </svg>
-          <span class="btn-text">联网搜索</span>
-        `;
+          btn.innerHTML = `
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <span class="btn-text">联网搜索</span>
+          `;
 
-        btn.onclick = async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
+          btn.onclick = async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
 
-          // 如果已经亮起，点击变暗
-          if (isWebSearchActive) {
-            isWebSearchActive = false;
-            btn.classList.remove("active");
-            try {
-              localStorage.setItem(STORAGE_KEY, "false");
-            } catch {}
-            if (ctx.toast?.info) {
-              ctx.toast.info("已关闭联网搜索");
+            // 如果已经亮起，点击变暗
+            if (isWebSearchActive) {
+              isWebSearchActive = false;
+              btn.classList.remove("active");
+              try {
+                localStorage.setItem(STORAGE_KEY, "false");
+              } catch {}
+              showToast("已关闭联网搜索", "info");
+              return;
             }
-            return;
-          }
 
-          // 如果当前是暗的，准备点亮：需要先判断并启动 MCP
-          btn.classList.add("loading");
-          const ok = await requestEnsureMcp();
-          btn.classList.remove("loading");
+            // 如果当前是暗的，准备点亮：需要先判断并启动 MCP
+            btn.classList.add("loading");
+            const ok = await requestEnsureMcp();
+            btn.classList.remove("loading");
 
-          if (ok) {
-            isWebSearchActive = true;
-            btn.classList.add("active");
-            try {
-              localStorage.setItem(STORAGE_KEY, "true");
-            } catch {}
-            if (ctx.toast?.success) {
-              ctx.toast.success("联网搜索已就绪");
+            if (ok) {
+              isWebSearchActive = true;
+              btn.classList.add("active");
+              try {
+                localStorage.setItem(STORAGE_KEY, "true");
+              } catch {}
+              showToast("联网搜索已就绪", "success");
+            } else {
+              isWebSearchActive = false;
+              btn.classList.remove("active");
             }
-          } else {
-            isWebSearchActive = false;
-            btn.classList.remove("active");
-          }
-        };
+          };
 
-        container.appendChild(btn);
-        return container;
-      }
-    });
-  }
+          container.appendChild(btn);
+          return container;
+        }
+      });
+    }
+  } catch {}
 
   /**
    * 拦截会话发送钩子：传递搜索开关状态

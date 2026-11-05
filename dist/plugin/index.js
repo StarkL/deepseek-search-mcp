@@ -1,6 +1,10 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 export const name = "dsh-plugin-deepseek-search";
+// 声明可选服务依赖，防止 Cordis 严格依赖隔离抛出 "cannot get property without inject"
+export const inject = {
+    optional: ["api"]
+};
 export function apply(ctx, config = {}) {
     const serverName = config.serverName || "deepseek-search";
     const defaultEnabled = config.defaultEnabled ?? false;
@@ -24,7 +28,7 @@ export function apply(ctx, config = {}) {
         // 1. 优先校验 API Key
         const apiKey = process.env.DEEPSEEK_API_KEY;
         if (!apiKey || apiKey.trim() === "") {
-            throw new Error("未检测到 DEEPSEEK_API_KEY！请在 DSH 设置或系统环境变量中配置您的 DeepSeek API Key。");
+            throw new Error("未检测到 DEEPSEEK_API_KEY！请在系统环境变量或 DSH 设置中配置您的 DeepSeek API Key。");
         }
         // 2. 如果已经在运行，直接复用
         if (isMcpRunning()) {
@@ -76,7 +80,7 @@ export function apply(ctx, config = {}) {
         mcpFork = null;
     };
     /**
-     * 注册 RPC / Service 接口，供前端 Client UI 或外部调用
+     * 状态与操作服务对象
      */
     const searchService = {
         getStatus: async () => ({
@@ -87,20 +91,33 @@ export function apply(ctx, config = {}) {
         ensureStarted,
         stop: stopMcp
     };
-    if (ctx.provide) {
-        ctx.provide("deepseekSearchService", searchService);
+    // 1. 注册为 Cordis 服务
+    try {
+        if (typeof ctx.provide === "function") {
+            ctx.provide("deepseekSearchService", searchService);
+        }
     }
-    // 同时也注册到内部 RPC 处理器（兼容不同版本 DSH 通信机制）
-    if (ctx.api && typeof ctx.api.register === "function") {
-        ctx.api.register("deepseekSearch/getStatus", searchService.getStatus);
-        ctx.api.register("deepseekSearch/ensureStarted", searchService.ensureStarted);
-        ctx.api.register("deepseekSearch/stop", searchService.stop);
+    catch { }
+    // 2. 原生 Cordis 事件总线兜底（零依赖、100% 安全可靠）
+    ctx.on("deepseekSearch/getStatus", searchService.getStatus);
+    ctx.on("deepseekSearch/ensureStarted", searchService.ensureStarted);
+    ctx.on("deepseekSearch/stop", searchService.stop);
+    // 3. 安全注册内部 RPC (使用 try/catch 隔离，防止不同 Cordis 运行时限制)
+    try {
+        const api = ctx.api;
+        if (api && typeof api.register === "function") {
+            api.register("deepseekSearch/getStatus", searchService.getStatus);
+            api.register("deepseekSearch/ensureStarted", searchService.ensureStarted);
+            api.register("deepseekSearch/stop", searchService.stop);
+        }
+    }
+    catch {
+        // 忽略特定环境下访问 api 的限制
     }
     /**
      * 拦截 Agent 对话生命周期：按需过滤/注入工具
      */
     ctx.on("agent/before-chat", async (session) => {
-        // 检查会话参数或全局开关
         const isSearchActive = session?.options?.enableDeepSeekSearch ?? defaultEnabled;
         if (!session || !Array.isArray(session.tools)) {
             return;
