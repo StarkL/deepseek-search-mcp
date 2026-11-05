@@ -81,25 +81,29 @@ claude mcp add deepseek-search -e DEEPSEEK_API_KEY=sk-your-deepseek-api-key '--'
 > }
 > ```
 
-#### 3. DeepSeek Harness (`dsh` 官方 Agent 运行时)
-DeepSeek 官方的 Agent 运行时 (`dsh`) 原生支持 MCP。有两种接入方式：
-- **方式 A（Web 界面）**：启动 `dsh web` 后，打开浏览器进入 **Settings → MCP**，点击添加 stdio 服务：
+#### 3. DeepSeek Harness (`dsh` 官方 Agent 运行时 / 桌面端)
+本项目已升级为 **DSH 原生全栈插件**，既可以直接作为 MCP 接入，也可作为具备 UI 交互的一等公民插件：
+
+- **方式 A（🌟 强烈推荐：仓库地址一键安装插件，获得官网同款联网按钮）**：
+  在 DSH 客户端 / Web 端插件管理中，选择 **Install from Git Repo（从仓库安装）**，输入：
+  ```text
+  https://github.com/StarkL/deepseek-search-mcp.git
+  ```
+  安装后：
+  - 聊天框下方会自动出现 **🌐 联网搜索** 胶囊切换按钮（类似 DeepSeek 官网）。
+  - **按需懒加载**：默认变暗（不运行后台进程、不浪费 Token）；点击亮起时自动检测并启动 MCP，无缝向会话注入搜索能力。
+- **方式 B（纯 MCP Stdio 接入）**：启动 `dsh web` 后进入 **Settings → MCP**，添加 stdio 服务：
   - **Command**: `npx`
   - **Args**: `-y github:StarkL/deepseek-search-mcp`
   - **Env**: `DEEPSEEK_API_KEY=sk-your-deepseek-api-key`
-- **方式 B（Profile 配置）**：在 Profile 的 patch 文件（如 `~/.dsh/profiles/default/cordis.patch.yml`）中添加插件项：
+- **方式 C（手动 Profile 配置）**：在 Profile patch（`~/.dsh/profiles/default/cordis.patch.yml`）中添加插件项：
   ```yaml
-  - id: mcp-deepseek-search
-    name: '@deepseek-ai/dsh-mcp-client'
-    config:
-      serverName: deepseek-search
-      transport: stdio
-      command: npx
-      args:
-        - '-y'
-        - 'github:StarkL/deepseek-search-mcp'
-      env:
-        DEEPSEEK_API_KEY: !!js process.env.DEEPSEEK_API_KEY
+  - insert:
+      - id: dsh-plugin-deepseek-search
+        name: '@starkl/deepseek-search-mcp'
+        config:
+          serverName: deepseek-search
+          defaultEnabled: false
   ```
 
 #### 4. Cursor

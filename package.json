@@ -1,9 +1,15 @@
 {
   "name": "@starkl/deepseek-search-mcp",
-  "version": "1.0.0",
-  "description": "Official-spec DeepSeek Search & Fetch MCP Server for AI Agents (Claude Desktop, Cursor, Cline, Windsurf, etc.)",
+  "version": "1.1.0",
+  "description": "Official-spec DeepSeek Search & Fetch MCP Server & DSH Plugin for AI Agents",
   "main": "dist/index.js",
   "type": "module",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": "./dist/client-ui/index.js"
+  },
   "bin": {
     "deepseek-search-mcp": "./dist/index.js"
   },
@@ -13,6 +19,7 @@
   },
   "files": [
     "dist",
+    "cordis.patch.yml",
     "README.md",
     "LICENSE"
   ],
@@ -25,6 +32,10 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
     "deepseek",
     "search",
     "fetch",
