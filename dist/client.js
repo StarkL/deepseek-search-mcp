@@ -1,161 +1,266 @@
-export class DeepSeekApiClient {
-    apiKey;
-    baseUrl;
-    constructor(apiKey, baseUrl) {
-        this.apiKey = apiKey || process.env.DEEPSEEK_API_KEY || "";
-        this.baseUrl = (baseUrl || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, "");
-        if (!this.apiKey) {
-            console.error("[DeepSeekApiClient] WARNING: DEEPSEEK_API_KEY is not set. Requests will fail until configured.");
-        }
+(function() {
+  var __load__ = (typeof window !== "undefined" && window.__ModuleLoader__ && typeof window.__ModuleLoader__.load === "function")
+    ? window.__ModuleLoader__.load.bind(window.__ModuleLoader__)
+    : function(opts) { if (opts && opts.factory) { try { opts.factory(function() { return {}; }); } catch(e) { console.error(e); } } };
+  __load__({ id: "@starkl/deepseek-search-mcp", factory: (require) => {
+  var module = { exports: {} }; var exports = module.exports;
+"use strict";
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name2 in all)
+    __defProp(target, name2, { get: all[name2], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// src/client-ui/index.ts
+var index_exports = {};
+__export(index_exports, {
+  apply: () => apply,
+  default: () => index_default,
+  name: () => name
+});
+module.exports = __toCommonJS(index_exports);
+var name = "dsh-client-deepseek-search";
+var STORAGE_KEY = "dsh_deepseek_search_enabled";
+function apply(ctx = {}) {
+  let isWebSearchActive = false;
+  try {
+    isWebSearchActive = localStorage.getItem(STORAGE_KEY) === "true";
+  } catch {
+    isWebSearchActive = false;
+  }
+  const injectStyles = () => {
+    if (typeof document === "undefined") return;
+    if (document.getElementById("dsh-search-toggle-style")) return;
+    const style = document.createElement("style");
+    style.id = "dsh-search-toggle-style";
+    style.textContent = `
+      .dsh-search-toggle-container {
+        display: inline-flex;
+        align-items: center;
+        margin: 0 4px;
+        vertical-align: middle;
+      }
+      .dsh-search-toggle-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 26px;
+        padding: 0 10px;
+        border-radius: 9999px;
+        font-size: 12px;
+        line-height: 1;
+        border: 1px solid rgba(140, 140, 140, 0.25);
+        background: rgba(255, 255, 255, 0.05);
+        color: #8c8c8c;
+        cursor: pointer;
+        outline: none;
+        user-select: none;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .dsh-search-toggle-btn:hover {
+        border-color: #4d6bfe;
+        color: #4d6bfe;
+        background: rgba(77, 107, 254, 0.08);
+      }
+      /* \u4EAE\u8D77\u72B6\u6001 (DeepSeek \u5B98\u7F51\u5FAE\u84DD\u9AD8\u4EAE) */
+      .dsh-search-toggle-btn.active {
+        background: rgba(77, 107, 254, 0.14) !important;
+        border-color: #4d6bfe !important;
+        color: #4d6bfe !important;
+        font-weight: 500;
+        box-shadow: 0 0 8px rgba(77, 107, 254, 0.25);
+      }
+      /* \u52A0\u8F7D\u4E2D\u72B6\u6001 */
+      .dsh-search-toggle-btn.loading {
+        opacity: 0.65;
+        cursor: wait;
+        pointer-events: none;
+      }
+      .dsh-search-toggle-btn .search-icon {
+        width: 13px;
+        height: 13px;
+        flex-shrink: 0;
+      }
+      .dsh-search-toggle-btn.loading .search-icon {
+        animation: dsh-search-spin 1s linear infinite;
+      }
+      @keyframes dsh-search-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(style);
+  };
+  injectStyles();
+  const showToast = (message, type = "info") => {
+    try {
+      if (ctx?.toast && typeof ctx.toast[type] === "function") {
+        ctx.toast[type](message);
+        return;
+      }
+    } catch {
     }
-    /**
-     * 执行网页搜索 (POST /v1/tools/search)
-     */
-    async search(params) {
-        this.ensureApiKey();
-        // 官方约束：query 必须 1~128 字符且非空
-        let cleanQuery = (params.query || "").trim();
-        if (!cleanQuery) {
-            throw new Error("Query cannot be empty.");
-        }
-        if (cleanQuery.length > 128) {
-            console.error(`[DeepSeekApiClient] Query exceeds 128 characters (${cleanQuery.length}), auto-truncating.`);
-            cleanQuery = cleanQuery.slice(0, 128);
-        }
-        // ori_question 限制 1~128 字符
-        let cleanOriQuestion = params.ori_question ? params.ori_question.trim() : null;
-        if (cleanOriQuestion && cleanOriQuestion.length > 128) {
-            cleanOriQuestion = cleanOriQuestion.slice(0, 128);
-        }
-        // count 范围 1~50
-        const count = Math.min(Math.max(params.count ?? 10, 1), 50);
-        const payload = {
-            query: cleanQuery,
-            count,
-            need_content: params.need_content ?? false,
-            ori_question: cleanOriQuestion || null,
-            localization: params.localization || ""
-        };
-        const endpoint = `${this.baseUrl}/v1/tools/search`;
-        return this.postWithRetry(endpoint, payload);
+    if (type === "error") {
+      alert(message);
     }
-    /**
-     * 执行单个网页抓取并转 Markdown (POST /v1/tools/fetch)
-     */
-    async fetch(params) {
-        this.ensureApiKey();
-        const cleanUrl = (params.url || "").trim();
-        if (!cleanUrl) {
-            throw new Error("URL cannot be empty.");
+  };
+  const requestEnsureMcp = async () => {
+    try {
+      try {
+        if (ctx?.deepseekSearchService && typeof ctx.deepseekSearchService.ensureStarted === "function") {
+          await ctx.deepseekSearchService.ensureStarted();
+          return true;
         }
-        if (cleanUrl.length > 8192) {
-            throw new Error(`URL length (${cleanUrl.length}) exceeds maximum limit of 8192 characters.`);
-        }
-        // 校验 URL 合法性
-        let parsed;
+      } catch {
+      }
+      if (typeof ctx?.emit === "function") {
+        await ctx.emit("deepseekSearch/ensureStarted");
+        return true;
+      }
+      return true;
+    } catch (err) {
+      const msg = err?.message || String(err);
+      showToast(msg, "error");
+      return false;
+    }
+  };
+  const createButtonNode = () => {
+    const container = document.createElement("div");
+    container.className = "dsh-search-toggle-container";
+    container.setAttribute("data-dsh-search-mcp", "true");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `dsh-search-toggle-btn ${isWebSearchActive ? "active" : ""}`;
+    btn.title = "\u70B9\u51FB\u5207\u6362\u662F\u5426\u542F\u7528 DeepSeek \u5B9E\u65F6\u7F51\u7EDC\u641C\u7D22\u4E0E\u6293\u53D6";
+    btn.innerHTML = `
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="2" y1="12" x2="22" y2="12"></line>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+      </svg>
+      <span class="btn-text">\u8054\u7F51\u641C\u7D22</span>
+    `;
+    btn.onclick = async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isWebSearchActive) {
+        isWebSearchActive = false;
+        document.querySelectorAll(".dsh-search-toggle-btn").forEach((el) => el.classList.remove("active"));
         try {
-            parsed = new URL(cleanUrl);
-            if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-                throw new Error("URL protocol must be HTTP or HTTPS.");
-            }
-            if (parsed.username || parsed.password) {
-                throw new Error("URL must not contain username or password credentials.");
-            }
+          localStorage.setItem(STORAGE_KEY, "false");
+        } catch {
         }
-        catch (e) {
-            throw new Error(`Invalid URL format: ${e.message}`);
+        showToast("\u5DF2\u5173\u95ED\u8054\u7F51\u641C\u7D22", "info");
+        return;
+      }
+      btn.classList.add("loading");
+      const ok = await requestEnsureMcp();
+      btn.classList.remove("loading");
+      if (ok) {
+        isWebSearchActive = true;
+        document.querySelectorAll(".dsh-search-toggle-btn").forEach((el) => el.classList.add("active"));
+        try {
+          localStorage.setItem(STORAGE_KEY, "true");
+        } catch {
         }
-        const payload = { url: cleanUrl };
-        const endpoint = `${this.baseUrl}/v1/tools/fetch`;
-        return this.postWithRetry(endpoint, payload);
+        showToast("\u8054\u7F51\u641C\u7D22\u5DF2\u5C31\u7EEA", "success");
+      } else {
+        isWebSearchActive = false;
+        btn.classList.remove("active");
+      }
+    };
+    container.appendChild(btn);
+    return container;
+  };
+  try {
+    const slots = ctx?.slots;
+    if (slots && typeof slots.register === "function") {
+      const slotNames = ["conversation.input.dock", "conversation.input.left", "conversation.input.bottom"];
+      slotNames.forEach((slotName) => {
+        try {
+          slots.register(slotName, {
+            id: `deepseek-search-toggle-${slotName}`,
+            order: 15,
+            render: createButtonNode
+          });
+        } catch {
+        }
+      });
     }
-    ensureApiKey() {
-        if (!this.apiKey) {
-            throw new Error("Missing DeepSeek API Key. Please configure the DEEPSEEK_API_KEY environment variable in your MCP client settings.");
-        }
+  } catch {
+  }
+  const tryMountToDom = () => {
+    if (typeof document === "undefined") return;
+    if (document.querySelector("[data-dsh-search-mcp='true']")) {
+      return;
     }
-    /**
-     * 带智能退避重试的 POST 请求
-     * 仅针对 408, 429, 5xx 错误自动重试
-     */
-    async postWithRetry(url, body, maxRetries = 3) {
-        let attempt = 0;
-        let delay = 600; // 初始退避毫秒数
-        while (attempt <= maxRetries) {
-            try {
-                const response = await fetch(url, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${this.apiKey}`,
-                        "User-Agent": "deepseek-search-mcp/1.0.0"
-                    },
-                    body: JSON.stringify(body)
-                });
-                if (response.ok) {
-                    return (await response.json());
-                }
-                const statusCode = response.status;
-                let errorData = null;
-                try {
-                    errorData = (await response.json());
-                }
-                catch {
-                    // 非 JSON 格式错误响应
-                }
-                const errorMessage = errorData?.error?.message || response.statusText || `HTTP ${statusCode}`;
-                // 401 密钥失效
-                if (statusCode === 401) {
-                    throw new Error(`DeepSeek API Key is invalid or expired (HTTP 401): ${errorMessage}. Please check your DEEPSEEK_API_KEY.`);
-                }
-                // 402 余额不足
-                if (statusCode === 402) {
-                    throw new Error(`DeepSeek API account balance is insufficient (HTTP 402): ${errorMessage}. Please top up your balance at https://platform.deepseek.com.`);
-                }
-                // 403 安全策略拒绝
-                if (statusCode === 403) {
-                    throw new Error(`Request rejected by DeepSeek security policy (HTTP 403): ${errorMessage}.`);
-                }
-                // 404 Fetch 网页未获取到内容
-                if (statusCode === 404) {
-                    const err = new Error(`Page content could not be retrieved (HTTP 404): ${errorMessage}`);
-                    err.isFetchNotFound = true;
-                    throw err;
-                }
-                // 400 / 413 等不可重试错误
-                const isRetryable = [408, 429, 500, 502, 503, 504].includes(statusCode);
-                if (!isRetryable || attempt >= maxRetries) {
-                    throw new Error(`DeepSeek API request failed with status ${statusCode}: ${errorMessage}`);
-                }
-                // 触发退避重试（带少量随机抖动 jitter）
-                attempt++;
-                const jitter = Math.floor(Math.random() * 200);
-                const waitMs = delay + jitter;
-                console.error(`[DeepSeekApiClient] Request returned ${statusCode} (${errorMessage}). Retrying attempt ${attempt}/${maxRetries} after ${waitMs}ms...`);
-                await new Promise((res) => setTimeout(res, waitMs));
-                delay *= 2; // 指数退避
-            }
-            catch (err) {
-                // 如果是已被抛出的不可重试业务异常，直接向上传递
-                if (err.message?.includes("HTTP 401") ||
-                    err.message?.includes("HTTP 402") ||
-                    err.message?.includes("HTTP 403") ||
-                    err.isFetchNotFound ||
-                    err.message?.includes("HTTP 400") ||
-                    err.message?.includes("HTTP 413")) {
-                    throw err;
-                }
-                // 网络断开等底层错误重试
-                if (attempt >= maxRetries) {
-                    throw err;
-                }
-                attempt++;
-                const waitMs = delay;
-                console.error(`[DeepSeekApiClient] Network error: ${err.message}. Retrying attempt ${attempt}/${maxRetries}...`);
-                await new Promise((res) => setTimeout(res, waitMs));
-                delay *= 2;
-            }
+    const allButtons = Array.from(document.querySelectorAll("button, div, span"));
+    const workspaceElem = allButtons.find((el) => {
+      const text = el.textContent || "";
+      return text.includes("\u5DE5\u4F5C\u533A\u5185\u4FEE\u6539") || text.includes("\u5DE5\u4F5C\u533A");
+    });
+    if (workspaceElem) {
+      let targetParent = workspaceElem;
+      while (targetParent && targetParent.parentElement) {
+        if (targetParent.parentElement.querySelector("button") && targetParent.parentElement.children.length >= 2) {
+          const container = createButtonNode();
+          if (targetParent.nextSibling) {
+            targetParent.parentElement.insertBefore(container, targetParent.nextSibling);
+          } else {
+            targetParent.parentElement.appendChild(container);
+          }
+          return;
         }
-        throw new Error(`Request failed after ${maxRetries} retry attempts.`);
+        targetParent = targetParent.parentElement;
+      }
     }
+    const textarea = document.querySelector("textarea");
+    if (textarea && textarea.parentElement) {
+      const parentCard = textarea.parentElement.parentElement || textarea.parentElement;
+      const bottomRow = parentCard.querySelector("div:last-child");
+      if (bottomRow && bottomRow !== textarea.parentElement) {
+        const container = createButtonNode();
+        bottomRow.appendChild(container);
+      }
+    }
+  };
+  tryMountToDom();
+  if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
+    const observer = new MutationObserver(() => {
+      tryMountToDom();
+    });
+    observer.observe(document.body || document.documentElement, {
+      childList: true,
+      subtree: true
+    });
+  }
+  if (typeof ctx?.on === "function") {
+    ctx.on("conversation/before-send", (event) => {
+      if (!event) return;
+      event.options = event.options || {};
+      event.options.enableDeepSeekSearch = isWebSearchActive;
+    });
+  }
 }
+if (typeof window !== "undefined") {
+  if (!window.__DSH_DEEPSEEK_SEARCH_CLIENT_LOADED__) {
+    window.__DSH_DEEPSEEK_SEARCH_CLIENT_LOADED__ = true;
+    apply();
+  }
+}
+var index_default = apply;
+  return module.exports;
+  } });
+})();

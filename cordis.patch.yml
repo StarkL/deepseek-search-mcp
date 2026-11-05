@@ -4,7 +4,7 @@
 
 - insert:
     - id: dsh-plugin-deepseek-search
-      name: ./dist/plugin/index.js
+      name: '@starkl/deepseek-search-mcp'
       config:
         serverName: deepseek-search
         defaultEnabled: false
