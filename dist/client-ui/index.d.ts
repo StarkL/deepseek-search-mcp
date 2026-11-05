@@ -6,5 +6,5 @@ export declare const name = "dsh-client-deepseek-search";
 export declare const inject: {
     optional: string[];
 };
-export declare function apply(ctx: any): void;
+export declare function apply(ctx?: any): void;
 export default apply;
