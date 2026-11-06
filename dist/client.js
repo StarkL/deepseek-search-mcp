@@ -5,9 +5,11 @@
   __load__({ id: "dsh-deepseek-search", factory: (require) => {
   var module = { exports: {} }; var exports = module.exports;
 "use strict";
+var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __export = (target, all) => {
   for (var name2 in all)
@@ -21,322 +23,164 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// src/client-ui/index.ts
+// src/client-ui/index.tsx
 var index_exports = {};
 __export(index_exports, {
+  SearchButton: () => SearchButton,
   apply: () => apply,
   default: () => index_default,
+  inject: () => inject,
   name: () => name
 });
 module.exports = __toCommonJS(index_exports);
+var import_react = __toESM(require("react"), 1);
 var name = "dsh-client-deepseek-search";
-var STORAGE_KEY = "dsh_deepseek_search_enabled";
-function apply(ctx = {}) {
-  let isWebSearchActive = false;
-  try {
-    isWebSearchActive = localStorage.getItem(STORAGE_KEY) === "true";
-  } catch {
-    isWebSearchActive = false;
-  }
-  const injectStyles = () => {
-    if (typeof document === "undefined") return;
-    if (document.getElementById("dsh-search-toggle-style")) return;
-    const style = document.createElement("style");
-    style.id = "dsh-search-toggle-style";
-    style.textContent = `
-      .dsh-search-toggle-container {
-        display: inline-flex;
-        align-items: center;
-        margin: 0 4px;
-        vertical-align: middle;
-      }
-      .dsh-search-toggle-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        height: 26px;
-        padding: 0 10px;
-        border-radius: 9999px;
-        font-size: 12px;
-        line-height: 1;
-        border: 1px solid rgba(140, 140, 140, 0.28);
-        background: rgba(255, 255, 255, 0.05);
-        color: #8c8c8c;
-        cursor: pointer;
-        outline: none;
-        user-select: none;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      .dsh-search-toggle-btn:hover {
-        border-color: #4d6bfe;
-        color: #4d6bfe;
-        background: rgba(77, 107, 254, 0.08);
-      }
-      /* \u4EAE\u8D77\u72B6\u6001 (DeepSeek \u5B98\u7F51\u5FAE\u84DD\u9AD8\u4EAE) */
-      .dsh-search-toggle-btn.active {
-        background: rgba(77, 107, 254, 0.14) !important;
-        border-color: #4d6bfe !important;
-        color: #4d6bfe !important;
-        font-weight: 500;
-        box-shadow: 0 0 8px rgba(77, 107, 254, 0.25);
-      }
-      /* \u52A0\u8F7D\u4E2D\u72B6\u6001 */
-      .dsh-search-toggle-btn.loading {
-        opacity: 0.65;
-        cursor: wait;
-        pointer-events: none;
-      }
-      .dsh-search-toggle-btn .search-icon {
-        width: 13px;
-        height: 13px;
-        flex-shrink: 0;
-      }
-      .dsh-search-toggle-btn.loading .search-icon {
-        animation: dsh-search-spin 1s linear infinite;
-      }
-      @keyframes dsh-search-spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-      }
-    `;
-    document.head.appendChild(style);
-  };
-  injectStyles();
-  const showToast = (message, type = "info") => {
+var inject = ["slots"];
+function SearchButton(props) {
+  const sessionObj = props.session ?? props.zone?.session;
+  const currentSessionId = sessionObj?.sessionId ?? props.sessionId ?? "default";
+  const [active, setActive] = (0, import_react.useState)(() => {
     try {
-      if (ctx?.toast && typeof ctx.toast[type] === "function") {
-        ctx.toast[type](message);
-        return;
-      }
+      return localStorage.getItem(`dsh.webSearchMode.${currentSessionId}`) === "true";
     } catch {
-    }
-    if (type === "error") {
-      alert(message);
-    }
-  };
-  const requestEnsureMcp = async () => {
-    try {
-      if (ctx?.deepseekSearchService && typeof ctx.deepseekSearchService.ensureStarted === "function") {
-        await ctx.deepseekSearchService.ensureStarted();
-        return true;
-      }
-      if (typeof ctx?.emit === "function") {
-        await ctx.emit("deepseekSearch/ensureStarted");
-        return true;
-      }
-      return true;
-    } catch (err) {
-      const msg = err?.message || String(err);
-      showToast(msg, "error");
       return false;
     }
-  };
-  let React = null;
-  try {
-    if (typeof require === "function") {
-      React = require("react");
-    }
-  } catch {
-  }
-  if (!React && typeof window !== "undefined") {
-    React = window.React;
-  }
-  let ReactComponent = null;
-  if (React && typeof React.createElement === "function") {
-    ReactComponent = function SearchToggleButton() {
-      const [active, setActive] = React.useState(isWebSearchActive);
-      const [loading, setLoading] = React.useState(false);
-      const handleClick = async (e) => {
-        if (e && e.preventDefault) e.preventDefault();
-        if (e && e.stopPropagation) e.stopPropagation();
-        if (active) {
-          setActive(false);
-          isWebSearchActive = false;
-          try {
-            localStorage.setItem(STORAGE_KEY, "false");
-          } catch {
-          }
-          showToast("\u5DF2\u5173\u95ED\u8054\u7F51\u641C\u7D22", "info");
-          return;
-        }
-        setLoading(true);
-        const ok = await requestEnsureMcp();
-        setLoading(false);
-        if (ok) {
-          setActive(true);
-          isWebSearchActive = true;
-          try {
-            localStorage.setItem(STORAGE_KEY, "true");
-          } catch {
-          }
-          showToast("\u8054\u7F51\u641C\u7D22\u5DF2\u5C31\u7EEA", "success");
-        } else {
-          setActive(false);
-          isWebSearchActive = false;
-        }
-      };
-      return React.createElement(
-        "div",
-        { className: "dsh-search-toggle-container", key: "dsh-search-toggle-box" },
-        React.createElement(
-          "button",
-          {
-            type: "button",
-            className: `dsh-search-toggle-btn ${active ? "active" : ""} ${loading ? "loading" : ""}`,
-            title: "\u70B9\u51FB\u5207\u6362\u662F\u5426\u542F\u7528 DeepSeek \u5B9E\u65F6\u7F51\u7EDC\u641C\u7D22\u4E0E\u6293\u53D6",
-            onClick: handleClick
-          },
-          React.createElement(
-            "svg",
-            {
-              className: "search-icon",
-              viewBox: "0 0 24 24",
-              fill: "none",
-              stroke: "currentColor",
-              strokeWidth: "2",
-              strokeLinecap: "round",
-              strokeLinejoin: "round"
-            },
-            React.createElement("circle", { cx: "12", cy: "12", r: "10" }),
-            React.createElement("line", { x1: "2", y1: "12", x2: "22", y2: "12" }),
-            React.createElement("path", { d: "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" })
-          ),
-          React.createElement("span", { className: "btn-text" }, "\u8054\u7F51\u641C\u7D22")
-        )
-      );
-    };
-  }
-  const registerToSlots = () => {
+  });
+  const [loading, setLoading] = (0, import_react.useState)(false);
+  (0, import_react.useEffect)(() => {
+    if (!currentSessionId) return;
     try {
-      const slots = ctx?.slots;
-      if (!slots) return;
-      const targetSlots = ["conversation.input.left", "conversation.input.dock", "conversation.input.right"];
-      targetSlots.forEach((slotName) => {
-        if (typeof slots.inject === "function") {
-          try {
-            slots.inject(slotName, () => {
-              if (typeof slots.register === "function") {
-                return slots.register(
-                  { id: `dsh-search-${slotName}`, order: 12 },
-                  () => ReactComponent ? React.createElement(ReactComponent) : createButtonNode()
-                );
-              }
-            });
-          } catch {
-          }
-        }
-        if (typeof slots.register === "function") {
-          try {
-            slots.register(slotName, {
-              id: `dsh-search-reg-${slotName}`,
-              order: 12,
-              component: ReactComponent,
-              render: () => ReactComponent ? React.createElement(ReactComponent) : createButtonNode()
-            });
-          } catch {
-          }
-        }
-      });
+      const stored = localStorage.getItem(`dsh.webSearchMode.${currentSessionId}`) === "true";
+      setActive(stored);
     } catch {
     }
+  }, [currentSessionId]);
+  const restoreFocus = () => {
+    setTimeout(() => {
+      const editor = document.querySelector('[contenteditable="true"]') || document.querySelector("textarea");
+      if (editor) {
+        editor.focus();
+      }
+    }, 30);
   };
-  registerToSlots();
-  function createButtonNode() {
-    const container = document.createElement("div");
-    container.className = "dsh-search-toggle-container";
-    container.setAttribute("data-dsh-search-mcp", "true");
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = `dsh-search-toggle-btn ${isWebSearchActive ? "active" : ""}`;
-    btn.title = "\u70B9\u51FB\u5207\u6362\u662F\u5426\u542F\u7528 DeepSeek \u5B9E\u65F6\u7F51\u7EDC\u641C\u7D22\u4E0E\u6293\u53D6";
-    btn.innerHTML = `
-      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="2" y1="12" x2="22" y2="12"></line>
-        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-      </svg>
-      <span class="btn-text">\u8054\u7F51\u641C\u7D22</span>
-    `;
-    btn.onclick = async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (isWebSearchActive) {
-        isWebSearchActive = false;
-        document.querySelectorAll(".dsh-search-toggle-btn").forEach((el) => el.classList.remove("active"));
-        try {
-          localStorage.setItem(STORAGE_KEY, "false");
-        } catch {
-        }
-        showToast("\u5DF2\u5173\u95ED\u8054\u7F51\u641C\u7D22", "info");
-        return;
+  const handleClick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (active) {
+      setActive(false);
+      try {
+        localStorage.setItem(`dsh.webSearchMode.${currentSessionId}`, "false");
+        localStorage.setItem("dsh.webSearchMode.global", "false");
+      } catch {
       }
-      btn.classList.add("loading");
-      const ok = await requestEnsureMcp();
-      btn.classList.remove("loading");
-      if (ok) {
-        isWebSearchActive = true;
-        document.querySelectorAll(".dsh-search-toggle-btn").forEach((el) => el.classList.add("active"));
-        try {
-          localStorage.setItem(STORAGE_KEY, "true");
-        } catch {
-        }
-        showToast("\u8054\u7F51\u641C\u7D22\u5DF2\u5C31\u7EEA", "success");
-      } else {
-        isWebSearchActive = false;
-        btn.classList.remove("active");
-      }
-    };
-    container.appendChild(btn);
-    return container;
-  }
-  const tryMountToDom = () => {
-    if (typeof document === "undefined") return;
-    if (document.querySelector("[data-dsh-search-mcp='true']")) return;
-    const allButtons = Array.from(document.querySelectorAll("button, div, span"));
-    const workspaceElem = allButtons.find((el) => {
-      const text = el.textContent || "";
-      return text.includes("\u5DE5\u4F5C\u533A\u5185\u4FEE\u6539") || text.includes("\u5DE5\u4F5C\u533A");
-    });
-    if (workspaceElem) {
-      let targetParent = workspaceElem;
-      while (targetParent && targetParent.parentElement) {
-        if (targetParent.parentElement.querySelector("button") && targetParent.parentElement.children.length >= 2) {
-          const container = createButtonNode();
-          if (targetParent.nextSibling) {
-            targetParent.parentElement.insertBefore(container, targetParent.nextSibling);
-          } else {
-            targetParent.parentElement.appendChild(container);
-          }
-          return;
-        }
-        targetParent = targetParent.parentElement;
-      }
+      restoreFocus();
+      return;
     }
+    setLoading(true);
+    let ok = false;
+    try {
+      if (window.__DSH_DEEPSEEK_SEARCH_ENSURE__) {
+        await window.__DSH_DEEPSEEK_SEARCH_ENSURE__();
+        ok = true;
+      } else {
+        ok = true;
+      }
+    } catch (err) {
+      alert(err?.message || "\u542F\u52A8\u8054\u7F51\u641C\u7D22\u670D\u52A1\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5 DEEPSEEK_API_KEY \u914D\u7F6E");
+      ok = false;
+    } finally {
+      setLoading(false);
+    }
+    if (ok) {
+      setActive(true);
+      try {
+        localStorage.setItem(`dsh.webSearchMode.${currentSessionId}`, "true");
+        localStorage.setItem("dsh.webSearchMode.global", "true");
+      } catch {
+      }
+    } else {
+      setActive(false);
+    }
+    restoreFocus();
   };
-  tryMountToDom();
-  if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
-    const observer = new MutationObserver(() => {
-      tryMountToDom();
-    });
-    observer.observe(document.body || document.documentElement, {
-      childList: true,
-      subtree: true
-    });
+  return /* @__PURE__ */ import_react.default.createElement(
+    "button",
+    {
+      type: "button",
+      className: `dsh-search-toggle-btn ${active ? "active" : ""} ${loading ? "loading" : ""}`,
+      title: active ? "\u8054\u7F51\u641C\u7D22\u5DF2\u5F00\u542F\uFF08\u5E38\u4EAE\uFF09\uFF1A\u70B9\u51FB\u53D8\u6697\u5173\u95ED" : "\u8054\u7F51\u641C\u7D22\u5DF2\u5173\u95ED\uFF08\u53D8\u6697\uFF09\uFF1A\u70B9\u51FB\u70B9\u4EAE\u5F00\u542F",
+      onClick: handleClick,
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "4px",
+        height: "26px",
+        padding: "0 10px",
+        borderRadius: "13px",
+        fontSize: "12px",
+        lineHeight: "20px",
+        fontWeight: active ? 600 : 500,
+        cursor: loading ? "wait" : "pointer",
+        userSelect: "none",
+        outline: "none",
+        transition: "all 0.18s cubic-bezier(0.4, 0, 0.2, 1)",
+        // 样式严格对齐聊天框底部工具栏：未激活时为半透明浅灰，激活时为官网亮蓝微光
+        border: active ? "1px solid #4d6bfe" : "1px solid rgba(140, 140, 140, 0.28)",
+        backgroundColor: active ? "rgba(77, 107, 254, 0.14)" : "rgba(255, 255, 255, 0.05)",
+        color: active ? "#4d6bfe" : "var(--dsw-alias-label-secondary, #8c8c8c)",
+        boxShadow: active ? "0 0 8px rgba(77, 107, 254, 0.28)" : "none",
+        opacity: loading ? 0.7 : 1
+      }
+    },
+    /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: "13px", lineHeight: "1" } }, "\u{1F310}"),
+    /* @__PURE__ */ import_react.default.createElement("span", null, loading ? "\u5C31\u7EEA\u4E2D..." : "\u8054\u7F51\u641C\u7D22")
+  );
+}
+function apply(ctx) {
+  if (typeof window !== "undefined") {
+    window.__DSH_DEEPSEEK_SEARCH_ENSURE__ = async () => {
+      if (ctx?.deepseekSearchService?.ensureStarted) {
+        return ctx.deepseekSearchService.ensureStarted();
+      }
+      if (typeof ctx?.emit === "function") {
+        return ctx.emit("deepseekSearch/ensureStarted");
+      }
+      return true;
+    };
   }
+  ctx.inject(["slots"], (scope) => {
+    scope.slots.inject(
+      "conversation.input.left",
+      () => scope.slots.register(
+        {
+          name: "conversation.input.left",
+          id: "dsh-deepseek-search-toggle",
+          order: 10,
+          inject: (sessionId) => ({ sessionId })
+        },
+        SearchButton
+      )
+    );
+  });
   if (typeof ctx?.on === "function") {
     ctx.on("conversation/before-send", (event) => {
       if (!event) return;
       event.options = event.options || {};
-      event.options.enableDeepSeekSearch = isWebSearchActive;
+      const activeId = event.session?.sessionId || event.sessionId;
+      const isSearchOn = activeId ? localStorage.getItem(`dsh.webSearchMode.${activeId}`) === "true" : localStorage.getItem("dsh.webSearchMode.global") === "true";
+      event.options.enableDeepSeekSearch = isSearchOn;
     });
-  }
-}
-if (typeof window !== "undefined") {
-  if (!window.__DSH_DEEPSEEK_SEARCH_CLIENT_LOADED__) {
-    window.__DSH_DEEPSEEK_SEARCH_CLIENT_LOADED__ = true;
-    apply();
   }
 }
 var index_default = apply;

@@ -1,340 +1,157 @@
-/**
- * DeepSeek Search DSH Client UI Extension
- * 为 DSH 聊天框下方注入类似 DeepSeek 官网的“联网搜索”交互按钮
- */
+import React, { useState, useEffect } from "react";
 export const name = "dsh-client-deepseek-search";
-const STORAGE_KEY = "dsh_deepseek_search_enabled";
-export function apply(ctx = {}) {
-    let isWebSearchActive = false;
-    try {
-        isWebSearchActive = localStorage.getItem(STORAGE_KEY) === "true";
-    }
-    catch {
-        isWebSearchActive = false;
-    }
-    // 注入 CSS 样式
-    const injectStyles = () => {
-        if (typeof document === "undefined")
-            return;
-        if (document.getElementById("dsh-search-toggle-style"))
-            return;
-        const style = document.createElement("style");
-        style.id = "dsh-search-toggle-style";
-        style.textContent = `
-      .dsh-search-toggle-container {
-        display: inline-flex;
-        align-items: center;
-        margin: 0 4px;
-        vertical-align: middle;
-      }
-      .dsh-search-toggle-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        height: 26px;
-        padding: 0 10px;
-        border-radius: 9999px;
-        font-size: 12px;
-        line-height: 1;
-        border: 1px solid rgba(140, 140, 140, 0.28);
-        background: rgba(255, 255, 255, 0.05);
-        color: #8c8c8c;
-        cursor: pointer;
-        outline: none;
-        user-select: none;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      .dsh-search-toggle-btn:hover {
-        border-color: #4d6bfe;
-        color: #4d6bfe;
-        background: rgba(77, 107, 254, 0.08);
-      }
-      /* 亮起状态 (DeepSeek 官网微蓝高亮) */
-      .dsh-search-toggle-btn.active {
-        background: rgba(77, 107, 254, 0.14) !important;
-        border-color: #4d6bfe !important;
-        color: #4d6bfe !important;
-        font-weight: 500;
-        box-shadow: 0 0 8px rgba(77, 107, 254, 0.25);
-      }
-      /* 加载中状态 */
-      .dsh-search-toggle-btn.loading {
-        opacity: 0.65;
-        cursor: wait;
-        pointer-events: none;
-      }
-      .dsh-search-toggle-btn .search-icon {
-        width: 13px;
-        height: 13px;
-        flex-shrink: 0;
-      }
-      .dsh-search-toggle-btn.loading .search-icon {
-        animation: dsh-search-spin 1s linear infinite;
-      }
-      @keyframes dsh-search-spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-      }
-    `;
-        document.head.appendChild(style);
-    };
-    injectStyles();
-    /**
-     * 安全显示 Toast 提示
-     */
-    const showToast = (message, type = "info") => {
+export const inject = ["slots"];
+export function SearchButton(props) {
+    const sessionObj = props.session ?? props.zone?.session;
+    const currentSessionId = sessionObj?.sessionId ?? props.sessionId ?? "default";
+    // 读取与当前会话绑定的联网状态
+    const [active, setActive] = useState(() => {
         try {
-            if (ctx?.toast && typeof ctx.toast[type] === "function") {
-                ctx.toast[type](message);
-                return;
-            }
+            return localStorage.getItem(`dsh.webSearchMode.${currentSessionId}`) === "true";
         }
-        catch { }
-        if (type === "error") {
-            alert(message);
-        }
-    };
-    /**
-     * 触发后端检查并拉起 MCP
-     */
-    const requestEnsureMcp = async () => {
-        try {
-            if (ctx?.deepseekSearchService && typeof ctx.deepseekSearchService.ensureStarted === "function") {
-                await ctx.deepseekSearchService.ensureStarted();
-                return true;
-            }
-            if (typeof ctx?.emit === "function") {
-                await ctx.emit("deepseekSearch/ensureStarted");
-                return true;
-            }
-            return true;
-        }
-        catch (err) {
-            const msg = err?.message || String(err);
-            showToast(msg, "error");
+        catch {
             return false;
         }
-    };
-    // 尝试获取宿主环境的 React
-    let React = null;
-    try {
-        // @ts-ignore
-        if (typeof require === "function") {
-            // @ts-ignore
-            React = require("react");
-        }
-    }
-    catch { }
-    if (!React && typeof window !== "undefined") {
-        // @ts-ignore
-        React = window.React;
-    }
-    /**
-     * React 组件定义
-     */
-    let ReactComponent = null;
-    if (React && typeof React.createElement === "function") {
-        ReactComponent = function SearchToggleButton() {
-            const [active, setActive] = React.useState(isWebSearchActive);
-            const [loading, setLoading] = React.useState(false);
-            const handleClick = async (e) => {
-                if (e && e.preventDefault)
-                    e.preventDefault();
-                if (e && e.stopPropagation)
-                    e.stopPropagation();
-                if (active) {
-                    setActive(false);
-                    isWebSearchActive = false;
-                    try {
-                        localStorage.setItem(STORAGE_KEY, "false");
-                    }
-                    catch { }
-                    showToast("已关闭联网搜索", "info");
-                    return;
-                }
-                setLoading(true);
-                const ok = await requestEnsureMcp();
-                setLoading(false);
-                if (ok) {
-                    setActive(true);
-                    isWebSearchActive = true;
-                    try {
-                        localStorage.setItem(STORAGE_KEY, "true");
-                    }
-                    catch { }
-                    showToast("联网搜索已就绪", "success");
-                }
-                else {
-                    setActive(false);
-                    isWebSearchActive = false;
-                }
-            };
-            return React.createElement("div", { className: "dsh-search-toggle-container", key: "dsh-search-toggle-box" }, React.createElement("button", {
-                type: "button",
-                className: `dsh-search-toggle-btn ${active ? "active" : ""} ${loading ? "loading" : ""}`,
-                title: "点击切换是否启用 DeepSeek 实时网络搜索与抓取",
-                onClick: handleClick
-            }, React.createElement("svg", {
-                className: "search-icon",
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2",
-                strokeLinecap: "round",
-                strokeLinejoin: "round"
-            }, React.createElement("circle", { cx: "12", cy: "12", r: "10" }), React.createElement("line", { x1: "2", y1: "12", x2: "22", y2: "12" }), React.createElement("path", { d: "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" })), React.createElement("span", { className: "btn-text" }, "联网搜索")));
-        };
-    }
-    /**
-     * 注册到 DSH 官方 Slot 插槽
-     */
-    const registerToSlots = () => {
+    });
+    const [loading, setLoading] = useState(false);
+    // 会话切换时自动同步当前会话的状态
+    useEffect(() => {
+        if (!currentSessionId)
+            return;
         try {
-            const slots = ctx?.slots;
-            if (!slots)
-                return;
-            const targetSlots = ["conversation.input.left", "conversation.input.dock", "conversation.input.right"];
-            targetSlots.forEach((slotName) => {
-                // 模式 A: slots.inject(slotName, () => slots.register(...))
-                if (typeof slots.inject === "function") {
-                    try {
-                        slots.inject(slotName, () => {
-                            if (typeof slots.register === "function") {
-                                return slots.register({ id: `dsh-search-${slotName}`, order: 12 }, () => ReactComponent ? React.createElement(ReactComponent) : createButtonNode());
-                            }
-                        });
-                    }
-                    catch { }
-                }
-                // 模式 B: slots.register(slotName, { component: ... })
-                if (typeof slots.register === "function") {
-                    try {
-                        slots.register(slotName, {
-                            id: `dsh-search-reg-${slotName}`,
-                            order: 12,
-                            component: ReactComponent,
-                            render: () => ReactComponent ? React.createElement(ReactComponent) : createButtonNode()
-                        });
-                    }
-                    catch { }
-                }
-            });
+            const stored = localStorage.getItem(`dsh.webSearchMode.${currentSessionId}`) === "true";
+            setActive(stored);
         }
         catch { }
-    };
-    registerToSlots();
-    /**
-     * 原生 DOM 按钮创建器（用于非 React 环境或 DOM 探测兜底）
-     */
-    function createButtonNode() {
-        const container = document.createElement("div");
-        container.className = "dsh-search-toggle-container";
-        container.setAttribute("data-dsh-search-mcp", "true");
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = `dsh-search-toggle-btn ${isWebSearchActive ? "active" : ""}`;
-        btn.title = "点击切换是否启用 DeepSeek 实时网络搜索与抓取";
-        btn.innerHTML = `
-      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="2" y1="12" x2="22" y2="12"></line>
-        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-      </svg>
-      <span class="btn-text">联网搜索</span>
-    `;
-        btn.onclick = async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (isWebSearchActive) {
-                isWebSearchActive = false;
-                document.querySelectorAll(".dsh-search-toggle-btn").forEach((el) => el.classList.remove("active"));
-                try {
-                    localStorage.setItem(STORAGE_KEY, "false");
-                }
-                catch { }
-                showToast("已关闭联网搜索", "info");
-                return;
+    }, [currentSessionId]);
+    // 点击后平滑恢复输入框的光标焦点
+    const restoreFocus = () => {
+        setTimeout(() => {
+            const editor = document.querySelector('[contenteditable="true"]') ||
+                document.querySelector("textarea");
+            if (editor) {
+                editor.focus();
             }
-            btn.classList.add("loading");
-            const ok = await requestEnsureMcp();
-            btn.classList.remove("loading");
-            if (ok) {
-                isWebSearchActive = true;
-                document.querySelectorAll(".dsh-search-toggle-btn").forEach((el) => el.classList.add("active"));
-                try {
-                    localStorage.setItem(STORAGE_KEY, "true");
-                }
-                catch { }
-                showToast("联网搜索已就绪", "success");
+        }, 30);
+    };
+    // 点击切换状态
+    const handleClick = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (active) {
+            // 变暗关闭
+            setActive(false);
+            try {
+                localStorage.setItem(`dsh.webSearchMode.${currentSessionId}`, "false");
+                localStorage.setItem("dsh.webSearchMode.global", "false");
+            }
+            catch { }
+            restoreFocus();
+            return;
+        }
+        // 亮起开启：先异步确保 MCP 搜索服务存活就绪
+        setLoading(true);
+        let ok = false;
+        try {
+            if (window.__DSH_DEEPSEEK_SEARCH_ENSURE__) {
+                await window.__DSH_DEEPSEEK_SEARCH_ENSURE__();
+                ok = true;
             }
             else {
-                isWebSearchActive = false;
-                btn.classList.remove("active");
-            }
-        };
-        container.appendChild(btn);
-        return container;
-    }
-    /**
-     * 智能 DOM 自动挂载器（双保险）
-     */
-    const tryMountToDom = () => {
-        if (typeof document === "undefined")
-            return;
-        if (document.querySelector("[data-dsh-search-mcp='true']"))
-            return;
-        // 寻找包含“工作区”的按钮
-        const allButtons = Array.from(document.querySelectorAll("button, div, span"));
-        const workspaceElem = allButtons.find((el) => {
-            const text = el.textContent || "";
-            return text.includes("工作区内修改") || text.includes("工作区");
-        });
-        if (workspaceElem) {
-            let targetParent = workspaceElem;
-            while (targetParent && targetParent.parentElement) {
-                if (targetParent.parentElement.querySelector("button") && targetParent.parentElement.children.length >= 2) {
-                    const container = createButtonNode();
-                    if (targetParent.nextSibling) {
-                        targetParent.parentElement.insertBefore(container, targetParent.nextSibling);
-                    }
-                    else {
-                        targetParent.parentElement.appendChild(container);
-                    }
-                    return;
-                }
-                targetParent = targetParent.parentElement;
+                ok = true;
             }
         }
+        catch (err) {
+            alert(err?.message || "启动联网搜索服务失败，请检查 DEEPSEEK_API_KEY 配置");
+            ok = false;
+        }
+        finally {
+            setLoading(false);
+        }
+        if (ok) {
+            setActive(true);
+            try {
+                localStorage.setItem(`dsh.webSearchMode.${currentSessionId}`, "true");
+                localStorage.setItem("dsh.webSearchMode.global", "true");
+            }
+            catch { }
+        }
+        else {
+            setActive(false);
+        }
+        restoreFocus();
     };
-    tryMountToDom();
-    if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
-        const observer = new MutationObserver(() => {
-            tryMountToDom();
-        });
-        observer.observe(document.body || document.documentElement, {
-            childList: true,
-            subtree: true
-        });
+    return (React.createElement("button", { type: "button", className: `dsh-search-toggle-btn ${active ? "active" : ""} ${loading ? "loading" : ""}`, title: active ? "联网搜索已开启（常亮）：点击变暗关闭" : "联网搜索已关闭（变暗）：点击点亮开启", onClick: handleClick, style: {
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "4px",
+            height: "26px",
+            padding: "0 10px",
+            borderRadius: "13px",
+            fontSize: "12px",
+            lineHeight: "20px",
+            fontWeight: active ? 600 : 500,
+            cursor: loading ? "wait" : "pointer",
+            userSelect: "none",
+            outline: "none",
+            transition: "all 0.18s cubic-bezier(0.4, 0, 0.2, 1)",
+            // 样式严格对齐聊天框底部工具栏：未激活时为半透明浅灰，激活时为官网亮蓝微光
+            border: active
+                ? "1px solid #4d6bfe"
+                : "1px solid rgba(140, 140, 140, 0.28)",
+            backgroundColor: active
+                ? "rgba(77, 107, 254, 0.14)"
+                : "rgba(255, 255, 255, 0.05)",
+            color: active
+                ? "#4d6bfe"
+                : "var(--dsw-alias-label-secondary, #8c8c8c)",
+            boxShadow: active
+                ? "0 0 8px rgba(77, 107, 254, 0.28)"
+                : "none",
+            opacity: loading ? 0.7 : 1,
+        } },
+        React.createElement("span", { style: { fontSize: "13px", lineHeight: "1" } }, "\uD83C\uDF10"),
+        React.createElement("span", null, loading ? "就绪中..." : "联网搜索")));
+}
+/**
+ * DSH 客户端插件入口：
+ * 精准注册到 conversation.input.left 插槽（与聊天输入框底部的 +、工作区修改 处于同一操作栏）
+ */
+export function apply(ctx) {
+    // 暴露给组件调用的跨层确保就绪钩子
+    if (typeof window !== "undefined") {
+        window.__DSH_DEEPSEEK_SEARCH_ENSURE__ = async () => {
+            if (ctx?.deepseekSearchService?.ensureStarted) {
+                return ctx.deepseekSearchService.ensureStarted();
+            }
+            if (typeof ctx?.emit === "function") {
+                return ctx.emit("deepseekSearch/ensureStarted");
+            }
+            return true;
+        };
     }
-    /**
-     * 拦截会话发送钩子：传递搜索开关状态
-     */
+    // 利用 DSH 规范的 slots.inject 挂载到输入框左侧操作区
+    ctx.inject(["slots"], (scope) => {
+        scope.slots.inject("conversation.input.left", () => scope.slots.register({
+            name: "conversation.input.left",
+            id: "dsh-deepseek-search-toggle",
+            order: 10,
+            inject: (sessionId) => ({ sessionId })
+        }, SearchButton));
+    });
+    // 拦截会话发送事件，同步开关状态给后端
     if (typeof ctx?.on === "function") {
         ctx.on("conversation/before-send", (event) => {
             if (!event)
                 return;
             event.options = event.options || {};
-            event.options.enableDeepSeekSearch = isWebSearchActive;
+            const activeId = event.session?.sessionId || event.sessionId;
+            const isSearchOn = activeId
+                ? localStorage.getItem(`dsh.webSearchMode.${activeId}`) === "true"
+                : localStorage.getItem("dsh.webSearchMode.global") === "true";
+            event.options.enableDeepSeekSearch = isSearchOn;
         });
-    }
-}
-// 兼容自执行环境
-if (typeof window !== "undefined") {
-    // @ts-ignore
-    if (!window.__DSH_DEEPSEEK_SEARCH_CLIENT_LOADED__) {
-        // @ts-ignore
-        window.__DSH_DEEPSEEK_SEARCH_CLIENT_LOADED__ = true;
-        apply();
     }
 }
 export default apply;

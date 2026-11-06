@@ -24,7 +24,7 @@ const footer = [
 ].join('\n');
 
 await esbuild.build({
-  entryPoints: [path.join(root, 'src/client-ui/index.ts')],
+  entryPoints: [path.join(root, 'src/client-ui/index.tsx')],
   outfile: path.join(root, 'dist/client.js'),
   bundle: true,
   format: 'cjs',
