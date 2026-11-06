@@ -70,53 +70,39 @@ export function SearchButton(props: SearchButtonProps) {
     }, 20);
   };
 
-  // 左键点击：快速切换开关
+  // 左键点击：直接切换开关（亮起/变暗），无需弹窗打扰
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // 如果当前已经是开启状态，点击则变暗关闭
-    if (active) {
-      setActive(false);
-      try {
-        localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}${currentSessionId}`, "false");
-        localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}global`, "false");
-      } catch {}
+    const nextState = !active;
+    setActive(nextState);
 
-      if (props.onExecuteCommand) {
-        props.onExecuteCommand("/deepseek-search off", currentSessionId).catch(() => {});
-      }
-      restoreFocus();
-      return;
-    }
-
-    // 如果当前是关闭状态，检查本地是否已经配置了 API Key
-    let savedKey = "";
     try {
-      savedKey = localStorage.getItem(STORAGE_API_KEY) || "";
-    } catch {}
-
-    // 如果还没有在界面配置过 Key，首次引导弹出配置弹窗
-    if (!savedKey.trim()) {
-      setApiKeyInput("");
-      setIsModalOpen(true);
-      return;
-    }
-
-    // 已经有 Key，直接点亮开启
-    setActive(true);
-    try {
-      localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}${currentSessionId}`, "true");
-      localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}global`, "true");
+      localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}${currentSessionId}`, nextState ? "true" : "false");
+      localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}global`, nextState ? "true" : "false");
     } catch {}
 
     if (props.onExecuteCommand) {
-      props.onExecuteCommand("/deepseek-search on", currentSessionId).catch(() => {});
+      if (nextState) {
+        // 如果本地存了自定义 Key，一并发送通知后端
+        let customKey = "";
+        try {
+          customKey = localStorage.getItem(STORAGE_API_KEY) || "";
+        } catch {}
+        if (customKey.trim()) {
+          props.onExecuteCommand(`/deepseek-search key ${customKey.trim()}`, currentSessionId).catch(() => {});
+        }
+        props.onExecuteCommand("/deepseek-search on", currentSessionId).catch(() => {});
+      } else {
+        props.onExecuteCommand("/deepseek-search off", currentSessionId).catch(() => {});
+      }
     }
+
     restoreFocus();
   };
 
-  // 右键点击：随时调出配置弹窗修改 Key
+  // 右键点击：随时调出配置弹窗，允许用户查看、修改或清空自定义 Key
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -128,22 +114,22 @@ export function SearchButton(props: SearchButtonProps) {
     setIsModalOpen(true);
   };
 
-  // 保存 API Key
+  // 保存 API Key 配置
   const handleSaveKey = () => {
     const trimmed = apiKeyInput.trim();
     try {
-      localStorage.setItem(STORAGE_API_KEY, trimmed);
-      // 保存后自动激活当前会话的联网搜索
-      localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}${currentSessionId}`, "true");
-      localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}global`, "true");
+      if (trimmed) {
+        localStorage.setItem(STORAGE_API_KEY, trimmed);
+      } else {
+        // 若清空保存，则移除自定义配置，自动使用官方登录凭据或环境变量兜底
+        localStorage.removeItem(STORAGE_API_KEY);
+      }
     } catch {}
 
-    setActive(true);
     if (props.onExecuteCommand) {
       if (trimmed) {
         props.onExecuteCommand(`/deepseek-search key ${trimmed}`, currentSessionId).catch(() => {});
       }
-      props.onExecuteCommand("/deepseek-search on", currentSessionId).catch(() => {});
     }
 
     setIsModalOpen(false);
@@ -155,7 +141,7 @@ export function SearchButton(props: SearchButtonProps) {
       <button
         type="button"
         className={`dsh-search-toggle-btn ${active ? "active" : ""}`}
-        title={active ? "联网搜索已开启（常亮）：点击变暗关闭，右键可修改配置" : "联网搜索已关闭（变暗）：点击点亮开启，右键可配置 API Key"}
+        title={active ? "联网搜索已开启（常亮）：点击关闭，右键可修改配置" : "联网搜索已关闭（变暗）：点击开启，右键可配置 API Key"}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         style={{
@@ -244,9 +230,9 @@ export function SearchButton(props: SearchButtonProps) {
             </div>
 
             {/* 功能说明与官方文档超链接 */}
-            <div style={{ fontSize: "13px", color: "var(--dsw-alias-label-secondary, #4b5563)", lineHeight: 1.5, marginBottom: "16px" }}>
+            <div style={{ fontSize: "13px", color: "var(--dsw-alias-label-secondary, #4b5563)", lineHeight: 1.5, marginBottom: "14px" }}>
               使用 DeepSeek 官方联网搜索服务（Search & Fetch），为模型提供实时网页检索与抓取能力。
-              <div style={{ marginTop: "6px" }}>
+              <div style={{ marginTop: "4px" }}>
                 <a
                   href="https://api-docs.deepseek.com/"
                   target="_blank"
@@ -262,15 +248,30 @@ export function SearchButton(props: SearchButtonProps) {
               </div>
             </div>
 
+            {/* 智能探测提示 */}
+            <div
+              style={{
+                backgroundColor: "var(--dsw-alias-interactive-bg, rgba(0, 0, 0, 0.03))",
+                borderRadius: "8px",
+                padding: "8px 12px",
+                fontSize: "12px",
+                color: "var(--dsw-alias-label-secondary, #6b7280)",
+                marginBottom: "14px",
+                border: "1px dashed var(--dsw-alias-border-l2, rgba(140, 140, 140, 0.25))"
+              }}
+            >
+              💡 <strong>自动兜底提示：</strong>系统已默认自动探测您在 DSH 中登录的 DeepSeek 官方账户凭据或系统环境变量，留空即可自动使用；如需使用特定的其他 API Key，可在此填写覆盖。
+            </div>
+
             {/* 输入表单 */}
             <div style={{ marginBottom: "14px" }}>
               <label style={{ display: "block", fontSize: "12px", fontWeight: 500, marginBottom: "6px" }}>
-                DeepSeek API Key
+                自定义 DeepSeek API Key（可选）
               </label>
               <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
                 <input
                   type={showPassword ? "text" : "password"}
-                  placeholder="请输入您的 DeepSeek API Key (sk-...)"
+                  placeholder="留空自动使用官方登录凭据，或输入 sk-..."
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -316,7 +317,7 @@ export function SearchButton(props: SearchButtonProps) {
 
             {/* 隐私提示与平台入口 */}
             <div style={{ fontSize: "11.5px", color: "var(--dsw-alias-label-tertiary, #6b7280)", lineHeight: 1.4, marginBottom: "20px" }}>
-              API Key 仅保存在您当前电脑本地设备。尚未获取 Key？
+              API Key 仅保存在您当前设备本地。尚未获取独立 Key？
               <a
                 href="https://platform.deepseek.com/"
                 target="_blank"
@@ -361,7 +362,7 @@ export function SearchButton(props: SearchButtonProps) {
                 }}
                 onClick={handleSaveKey}
               >
-                保存并开启
+                保存
               </button>
             </div>
           </div>
