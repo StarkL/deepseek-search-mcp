@@ -1,6 +1,6 @@
 {
-  "name": "@starkl/deepseek-search-mcp",
-  "version": "1.1.5",
+  "name": "dsh-deepseek-search",
+  "version": "1.2.0",
   "description": "Official-spec DeepSeek Search & Fetch MCP Server & DSH Plugin for AI Agents",
   "main": "dist/plugin/index.js",
   "exports": {

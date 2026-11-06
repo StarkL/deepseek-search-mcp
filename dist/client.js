@@ -2,7 +2,7 @@
   var __load__ = (typeof window !== "undefined" && window.__ModuleLoader__ && typeof window.__ModuleLoader__.load === "function")
     ? window.__ModuleLoader__.load.bind(window.__ModuleLoader__)
     : function(opts) { if (opts && opts.factory) { try { opts.factory(function() { return {}; }); } catch(e) { console.error(e); } } };
-  __load__({ id: "@starkl/deepseek-search-mcp", factory: (require) => {
+  __load__({ id: "dsh-deepseek-search", factory: (require) => {
   var module = { exports: {} }; var exports = module.exports;
 "use strict";
 var __defProp = Object.defineProperty;
@@ -61,7 +61,7 @@ function apply(ctx = {}) {
         border-radius: 9999px;
         font-size: 12px;
         line-height: 1;
-        border: 1px solid rgba(140, 140, 140, 0.25);
+        border: 1px solid rgba(140, 140, 140, 0.28);
         background: rgba(255, 255, 255, 0.05);
         color: #8c8c8c;
         cursor: pointer;
@@ -118,12 +118,9 @@ function apply(ctx = {}) {
   };
   const requestEnsureMcp = async () => {
     try {
-      try {
-        if (ctx?.deepseekSearchService && typeof ctx.deepseekSearchService.ensureStarted === "function") {
-          await ctx.deepseekSearchService.ensureStarted();
-          return true;
-        }
-      } catch {
+      if (ctx?.deepseekSearchService && typeof ctx.deepseekSearchService.ensureStarted === "function") {
+        await ctx.deepseekSearchService.ensureStarted();
+        return true;
       }
       if (typeof ctx?.emit === "function") {
         await ctx.emit("deepseekSearch/ensureStarted");
@@ -136,7 +133,117 @@ function apply(ctx = {}) {
       return false;
     }
   };
-  const createButtonNode = () => {
+  let React = null;
+  try {
+    if (typeof require === "function") {
+      React = require("react");
+    }
+  } catch {
+  }
+  if (!React && typeof window !== "undefined") {
+    React = window.React;
+  }
+  let ReactComponent = null;
+  if (React && typeof React.createElement === "function") {
+    ReactComponent = function SearchToggleButton() {
+      const [active, setActive] = React.useState(isWebSearchActive);
+      const [loading, setLoading] = React.useState(false);
+      const handleClick = async (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        if (e && e.stopPropagation) e.stopPropagation();
+        if (active) {
+          setActive(false);
+          isWebSearchActive = false;
+          try {
+            localStorage.setItem(STORAGE_KEY, "false");
+          } catch {
+          }
+          showToast("\u5DF2\u5173\u95ED\u8054\u7F51\u641C\u7D22", "info");
+          return;
+        }
+        setLoading(true);
+        const ok = await requestEnsureMcp();
+        setLoading(false);
+        if (ok) {
+          setActive(true);
+          isWebSearchActive = true;
+          try {
+            localStorage.setItem(STORAGE_KEY, "true");
+          } catch {
+          }
+          showToast("\u8054\u7F51\u641C\u7D22\u5DF2\u5C31\u7EEA", "success");
+        } else {
+          setActive(false);
+          isWebSearchActive = false;
+        }
+      };
+      return React.createElement(
+        "div",
+        { className: "dsh-search-toggle-container", key: "dsh-search-toggle-box" },
+        React.createElement(
+          "button",
+          {
+            type: "button",
+            className: `dsh-search-toggle-btn ${active ? "active" : ""} ${loading ? "loading" : ""}`,
+            title: "\u70B9\u51FB\u5207\u6362\u662F\u5426\u542F\u7528 DeepSeek \u5B9E\u65F6\u7F51\u7EDC\u641C\u7D22\u4E0E\u6293\u53D6",
+            onClick: handleClick
+          },
+          React.createElement(
+            "svg",
+            {
+              className: "search-icon",
+              viewBox: "0 0 24 24",
+              fill: "none",
+              stroke: "currentColor",
+              strokeWidth: "2",
+              strokeLinecap: "round",
+              strokeLinejoin: "round"
+            },
+            React.createElement("circle", { cx: "12", cy: "12", r: "10" }),
+            React.createElement("line", { x1: "2", y1: "12", x2: "22", y2: "12" }),
+            React.createElement("path", { d: "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" })
+          ),
+          React.createElement("span", { className: "btn-text" }, "\u8054\u7F51\u641C\u7D22")
+        )
+      );
+    };
+  }
+  const registerToSlots = () => {
+    try {
+      const slots = ctx?.slots;
+      if (!slots) return;
+      const targetSlots = ["conversation.input.left", "conversation.input.dock", "conversation.input.right"];
+      targetSlots.forEach((slotName) => {
+        if (typeof slots.inject === "function") {
+          try {
+            slots.inject(slotName, () => {
+              if (typeof slots.register === "function") {
+                return slots.register(
+                  { id: `dsh-search-${slotName}`, order: 12 },
+                  () => ReactComponent ? React.createElement(ReactComponent) : createButtonNode()
+                );
+              }
+            });
+          } catch {
+          }
+        }
+        if (typeof slots.register === "function") {
+          try {
+            slots.register(slotName, {
+              id: `dsh-search-reg-${slotName}`,
+              order: 12,
+              component: ReactComponent,
+              render: () => ReactComponent ? React.createElement(ReactComponent) : createButtonNode()
+            });
+          } catch {
+          }
+        }
+      });
+    } catch {
+    }
+  };
+  registerToSlots();
+  function createButtonNode() {
     const container = document.createElement("div");
     container.className = "dsh-search-toggle-container";
     container.setAttribute("data-dsh-search-mcp", "true");
@@ -148,7 +255,7 @@ function apply(ctx = {}) {
       <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"></circle>
         <line x1="2" y1="12" x2="22" y2="12"></line>
-        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
       </svg>
       <span class="btn-text">\u8054\u7F51\u641C\u7D22</span>
     `;
@@ -183,29 +290,10 @@ function apply(ctx = {}) {
     };
     container.appendChild(btn);
     return container;
-  };
-  try {
-    const slots = ctx?.slots;
-    if (slots && typeof slots.register === "function") {
-      const slotNames = ["conversation.input.dock", "conversation.input.left", "conversation.input.bottom"];
-      slotNames.forEach((slotName) => {
-        try {
-          slots.register(slotName, {
-            id: `deepseek-search-toggle-${slotName}`,
-            order: 15,
-            render: createButtonNode
-          });
-        } catch {
-        }
-      });
-    }
-  } catch {
   }
   const tryMountToDom = () => {
     if (typeof document === "undefined") return;
-    if (document.querySelector("[data-dsh-search-mcp='true']")) {
-      return;
-    }
+    if (document.querySelector("[data-dsh-search-mcp='true']")) return;
     const allButtons = Array.from(document.querySelectorAll("button, div, span"));
     const workspaceElem = allButtons.find((el) => {
       const text = el.textContent || "";
@@ -224,15 +312,6 @@ function apply(ctx = {}) {
           return;
         }
         targetParent = targetParent.parentElement;
-      }
-    }
-    const textarea = document.querySelector("textarea");
-    if (textarea && textarea.parentElement) {
-      const parentCard = textarea.parentElement.parentElement || textarea.parentElement;
-      const bottomRow = parentCard.querySelector("div:last-child");
-      if (bottomRow && bottomRow !== textarea.parentElement) {
-        const container = createButtonNode();
-        bottomRow.appendChild(container);
       }
     }
   };

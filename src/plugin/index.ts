@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import type { PluginConfig, McpStatusResponse, EnsureStartedResult } from "./types.js";
 
-export const name = "dsh-plugin-deepseek-search";
+export const name = "dsh-deepseek-search";
 
 export function apply(ctx: any, config: PluginConfig = {}) {
   const serverName = config.serverName || "deepseek-search";

@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, '..');
 
-const PLUGIN_ID = "@starkl/deepseek-search-mcp";
+const PLUGIN_ID = "dsh-deepseek-search";
 
 const banner = [
   `(function() {`,

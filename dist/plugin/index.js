@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-export const name = "dsh-plugin-deepseek-search";
+export const name = "dsh-deepseek-search";
 export function apply(ctx, config = {}) {
     const serverName = config.serverName || "deepseek-search";
     const defaultEnabled = config.defaultEnabled ?? false;
