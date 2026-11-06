@@ -31,8 +31,6 @@ export function SearchButton(props: SearchButtonProps) {
     }
   });
 
-  const [loading, setLoading] = useState<boolean>(false);
-
   // 会话切换时自动同步当前会话的状态
   useEffect(() => {
     if (!currentSessionId) return;
@@ -51,51 +49,21 @@ export function SearchButton(props: SearchButtonProps) {
       if (editor) {
         editor.focus();
       }
-    }, 30);
+    }, 20);
   };
 
-  // 点击切换状态
-  const handleClick = async (e: React.MouseEvent) => {
+  // 即时切换状态（零弹窗、零时延、瞬间切换）
+  const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (active) {
-      // 变暗关闭
-      setActive(false);
-      try {
-        localStorage.setItem(`dsh.webSearchMode.${currentSessionId}`, "false");
-        localStorage.setItem("dsh.webSearchMode.global", "false");
-      } catch {}
-      restoreFocus();
-      return;
-    }
+    const next = !active;
+    setActive(next);
 
-    // 亮起开启：先异步确保 MCP 搜索服务存活就绪
-    setLoading(true);
-    let ok = false;
     try {
-      if ((window as any).__DSH_DEEPSEEK_SEARCH_ENSURE__) {
-        await (window as any).__DSH_DEEPSEEK_SEARCH_ENSURE__();
-        ok = true;
-      } else {
-        ok = true;
-      }
-    } catch (err: any) {
-      alert(err?.message || "启动联网搜索服务失败，请检查 DEEPSEEK_API_KEY 配置");
-      ok = false;
-    } finally {
-      setLoading(false);
-    }
-
-    if (ok) {
-      setActive(true);
-      try {
-        localStorage.setItem(`dsh.webSearchMode.${currentSessionId}`, "true");
-        localStorage.setItem("dsh.webSearchMode.global", "true");
-      } catch {}
-    } else {
-      setActive(false);
-    }
+      localStorage.setItem(`dsh.webSearchMode.${currentSessionId}`, next ? "true" : "false");
+      localStorage.setItem("dsh.webSearchMode.global", next ? "true" : "false");
+    } catch {}
 
     restoreFocus();
   };
@@ -103,65 +71,48 @@ export function SearchButton(props: SearchButtonProps) {
   return (
     <button
       type="button"
-      className={`dsh-search-toggle-btn ${active ? "active" : ""} ${loading ? "loading" : ""}`}
+      className={`dsh-search-toggle-btn ${active ? "active" : ""}`}
       title={active ? "联网搜索已开启（常亮）：点击变暗关闭" : "联网搜索已关闭（变暗）：点击点亮开启"}
       onClick={handleClick}
       style={{
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: "4px",
         height: "26px",
-        padding: "0 10px",
+        padding: "0 12px",
         borderRadius: "13px",
         fontSize: "12px",
         lineHeight: "20px",
         fontWeight: active ? 600 : 500,
-        cursor: loading ? "wait" : "pointer",
+        cursor: "pointer",
         userSelect: "none",
         outline: "none",
-        transition: "all 0.18s cubic-bezier(0.4, 0, 0.2, 1)",
-        // 样式严格对齐聊天框底部工具栏：未激活时为半透明浅灰，激活时为官网亮蓝微光
+        transition: "all 0.15s ease-in-out",
+        // 使用 DSH 官方 Design Token 变量，深色/浅色/自定义主题自适应
         border: active
-          ? "1px solid #4d6bfe"
-          : "1px solid rgba(140, 140, 140, 0.28)",
+          ? "1px solid var(--dsw-alias-brand-primary, #4d6bfe)"
+          : "1px solid var(--dsw-alias-border-l2, rgba(140, 140, 140, 0.28))",
         backgroundColor: active
           ? "rgba(77, 107, 254, 0.14)"
-          : "rgba(255, 255, 255, 0.05)",
+          : "var(--dsw-alias-interactive-bg, rgba(255, 255, 255, 0.05))",
         color: active
-          ? "#4d6bfe"
+          ? "var(--dsw-alias-brand-primary, #4d6bfe)"
           : "var(--dsw-alias-label-secondary, #8c8c8c)",
         boxShadow: active
-          ? "0 0 8px rgba(77, 107, 254, 0.28)"
+          ? "0 0 8px rgba(77, 107, 254, 0.25)"
           : "none",
-        opacity: loading ? 0.7 : 1,
       }}
     >
-      <span style={{ fontSize: "13px", lineHeight: "1" }}>🌐</span>
-      <span>{loading ? "就绪中..." : "联网搜索"}</span>
+      <span>联网搜索</span>
     </button>
   );
 }
 
 /**
  * DSH 客户端插件入口：
- * 精准注册到 conversation.input.left 插槽（与聊天输入框底部的 +、工作区修改 处于同一操作栏）
+ * 挂载到 conversation.input.left 插槽
  */
 export function apply(ctx: any) {
-  // 暴露给组件调用的跨层确保就绪钩子
-  if (typeof window !== "undefined") {
-    (window as any).__DSH_DEEPSEEK_SEARCH_ENSURE__ = async () => {
-      if (ctx?.deepseekSearchService?.ensureStarted) {
-        return ctx.deepseekSearchService.ensureStarted();
-      }
-      if (typeof ctx?.emit === "function") {
-        return ctx.emit("deepseekSearch/ensureStarted");
-      }
-      return true;
-    };
-  }
-
-  // 利用 DSH 规范的 slots.inject 挂载到输入框左侧操作区
   ctx.inject(["slots"], (scope: any) => {
     scope.slots.inject("conversation.input.left", () =>
       scope.slots.register(
@@ -182,9 +133,14 @@ export function apply(ctx: any) {
       if (!event) return;
       event.options = event.options || {};
       const activeId = event.session?.sessionId || event.sessionId;
-      const isSearchOn = activeId
-        ? localStorage.getItem(`dsh.webSearchMode.${activeId}`) === "true"
-        : localStorage.getItem("dsh.webSearchMode.global") === "true";
+      let isSearchOn = false;
+      try {
+        isSearchOn = activeId
+          ? localStorage.getItem(`dsh.webSearchMode.${activeId}`) === "true"
+          : localStorage.getItem("dsh.webSearchMode.global") === "true";
+      } catch {
+        isSearchOn = false;
+      }
       event.options.enableDeepSeekSearch = isSearchOn;
     });
   }

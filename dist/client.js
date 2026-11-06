@@ -56,7 +56,6 @@ function SearchButton(props) {
       return false;
     }
   });
-  const [loading, setLoading] = (0, import_react.useState)(false);
   (0, import_react.useEffect)(() => {
     if (!currentSessionId) return;
     try {
@@ -71,45 +70,17 @@ function SearchButton(props) {
       if (editor) {
         editor.focus();
       }
-    }, 30);
+    }, 20);
   };
-  const handleClick = async (e) => {
+  const handleClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (active) {
-      setActive(false);
-      try {
-        localStorage.setItem(`dsh.webSearchMode.${currentSessionId}`, "false");
-        localStorage.setItem("dsh.webSearchMode.global", "false");
-      } catch {
-      }
-      restoreFocus();
-      return;
-    }
-    setLoading(true);
-    let ok = false;
+    const next = !active;
+    setActive(next);
     try {
-      if (window.__DSH_DEEPSEEK_SEARCH_ENSURE__) {
-        await window.__DSH_DEEPSEEK_SEARCH_ENSURE__();
-        ok = true;
-      } else {
-        ok = true;
-      }
-    } catch (err) {
-      alert(err?.message || "\u542F\u52A8\u8054\u7F51\u641C\u7D22\u670D\u52A1\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5 DEEPSEEK_API_KEY \u914D\u7F6E");
-      ok = false;
-    } finally {
-      setLoading(false);
-    }
-    if (ok) {
-      setActive(true);
-      try {
-        localStorage.setItem(`dsh.webSearchMode.${currentSessionId}`, "true");
-        localStorage.setItem("dsh.webSearchMode.global", "true");
-      } catch {
-      }
-    } else {
-      setActive(false);
+      localStorage.setItem(`dsh.webSearchMode.${currentSessionId}`, next ? "true" : "false");
+      localStorage.setItem("dsh.webSearchMode.global", next ? "true" : "false");
+    } catch {
     }
     restoreFocus();
   };
@@ -117,48 +88,34 @@ function SearchButton(props) {
     "button",
     {
       type: "button",
-      className: `dsh-search-toggle-btn ${active ? "active" : ""} ${loading ? "loading" : ""}`,
+      className: `dsh-search-toggle-btn ${active ? "active" : ""}`,
       title: active ? "\u8054\u7F51\u641C\u7D22\u5DF2\u5F00\u542F\uFF08\u5E38\u4EAE\uFF09\uFF1A\u70B9\u51FB\u53D8\u6697\u5173\u95ED" : "\u8054\u7F51\u641C\u7D22\u5DF2\u5173\u95ED\uFF08\u53D8\u6697\uFF09\uFF1A\u70B9\u51FB\u70B9\u4EAE\u5F00\u542F",
       onClick: handleClick,
       style: {
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: "4px",
         height: "26px",
-        padding: "0 10px",
+        padding: "0 12px",
         borderRadius: "13px",
         fontSize: "12px",
         lineHeight: "20px",
         fontWeight: active ? 600 : 500,
-        cursor: loading ? "wait" : "pointer",
+        cursor: "pointer",
         userSelect: "none",
         outline: "none",
-        transition: "all 0.18s cubic-bezier(0.4, 0, 0.2, 1)",
-        // 样式严格对齐聊天框底部工具栏：未激活时为半透明浅灰，激活时为官网亮蓝微光
-        border: active ? "1px solid #4d6bfe" : "1px solid rgba(140, 140, 140, 0.28)",
-        backgroundColor: active ? "rgba(77, 107, 254, 0.14)" : "rgba(255, 255, 255, 0.05)",
-        color: active ? "#4d6bfe" : "var(--dsw-alias-label-secondary, #8c8c8c)",
-        boxShadow: active ? "0 0 8px rgba(77, 107, 254, 0.28)" : "none",
-        opacity: loading ? 0.7 : 1
+        transition: "all 0.15s ease-in-out",
+        // 使用 DSH 官方 Design Token 变量，深色/浅色/自定义主题自适应
+        border: active ? "1px solid var(--dsw-alias-brand-primary, #4d6bfe)" : "1px solid var(--dsw-alias-border-l2, rgba(140, 140, 140, 0.28))",
+        backgroundColor: active ? "rgba(77, 107, 254, 0.14)" : "var(--dsw-alias-interactive-bg, rgba(255, 255, 255, 0.05))",
+        color: active ? "var(--dsw-alias-brand-primary, #4d6bfe)" : "var(--dsw-alias-label-secondary, #8c8c8c)",
+        boxShadow: active ? "0 0 8px rgba(77, 107, 254, 0.25)" : "none"
       }
     },
-    /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: "13px", lineHeight: "1" } }, "\u{1F310}"),
-    /* @__PURE__ */ import_react.default.createElement("span", null, loading ? "\u5C31\u7EEA\u4E2D..." : "\u8054\u7F51\u641C\u7D22")
+    /* @__PURE__ */ import_react.default.createElement("span", null, "\u8054\u7F51\u641C\u7D22")
   );
 }
 function apply(ctx) {
-  if (typeof window !== "undefined") {
-    window.__DSH_DEEPSEEK_SEARCH_ENSURE__ = async () => {
-      if (ctx?.deepseekSearchService?.ensureStarted) {
-        return ctx.deepseekSearchService.ensureStarted();
-      }
-      if (typeof ctx?.emit === "function") {
-        return ctx.emit("deepseekSearch/ensureStarted");
-      }
-      return true;
-    };
-  }
   ctx.inject(["slots"], (scope) => {
     scope.slots.inject(
       "conversation.input.left",
@@ -178,7 +135,12 @@ function apply(ctx) {
       if (!event) return;
       event.options = event.options || {};
       const activeId = event.session?.sessionId || event.sessionId;
-      const isSearchOn = activeId ? localStorage.getItem(`dsh.webSearchMode.${activeId}`) === "true" : localStorage.getItem("dsh.webSearchMode.global") === "true";
+      let isSearchOn = false;
+      try {
+        isSearchOn = activeId ? localStorage.getItem(`dsh.webSearchMode.${activeId}`) === "true" : localStorage.getItem("dsh.webSearchMode.global") === "true";
+      } catch {
+        isSearchOn = false;
+      }
       event.options.enableDeepSeekSearch = isSearchOn;
     });
   }
