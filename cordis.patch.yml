@@ -1,10 +1,3 @@
-# cordis.patch.yml
-# DeepSeek Harness (DSH) 插件配置文件
-# 用于在 DSH 中通过 GitHub 仓库地址直接安装并自动注入
-
 - insert:
-    - id: dsh-plugin-deepseek-search
-      name: 'dsh-deepseek-search'
-      config:
-        serverName: deepseek-search
-        defaultEnabled: false
+    - id: dsh-deepseek-search
+      name: dsh-deepseek-search

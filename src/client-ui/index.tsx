@@ -1,17 +1,26 @@
 import React, { useState, useEffect } from "react";
 
-export const name = "dsh-client-deepseek-search";
-export const inject = ["slots"] as const;
+export const name = "dsh-deepseek-search";
+export const inject = ["slots", "remote.commands", "sessions"] as const;
 
 const STORAGE_MODE_KEY_PREFIX = "dsh.webSearchMode.";
 const STORAGE_API_KEY = "dsh_deepseek_search_api_key";
 
+export interface ZoneProps {
+  session?: {
+    sessionId: string;
+    [key: string]: any;
+  };
+  input?: {
+    draft: string;
+    [key: string]: any;
+  };
+}
+
 export interface SearchButtonProps {
-  zone?: {
-    session?: {
-      sessionId: string;
-      [key: string]: any;
-    };
+  zone?: ZoneProps;
+  input?: {
+    draft: string;
     [key: string]: any;
   };
   session?: {
@@ -19,6 +28,7 @@ export interface SearchButtonProps {
     [key: string]: any;
   };
   sessionId?: string;
+  onExecuteCommand?: (cmd: string, sid?: string) => Promise<any>;
 }
 
 export function SearchButton(props: SearchButtonProps) {
@@ -72,6 +82,10 @@ export function SearchButton(props: SearchButtonProps) {
         localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}${currentSessionId}`, "false");
         localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}global`, "false");
       } catch {}
+
+      if (props.onExecuteCommand) {
+        props.onExecuteCommand("/deepseek-search off", currentSessionId).catch(() => {});
+      }
       restoreFocus();
       return;
     }
@@ -96,6 +110,9 @@ export function SearchButton(props: SearchButtonProps) {
       localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}global`, "true");
     } catch {}
 
+    if (props.onExecuteCommand) {
+      props.onExecuteCommand("/deepseek-search on", currentSessionId).catch(() => {});
+    }
     restoreFocus();
   };
 
@@ -122,6 +139,13 @@ export function SearchButton(props: SearchButtonProps) {
     } catch {}
 
     setActive(true);
+    if (props.onExecuteCommand) {
+      if (trimmed) {
+        props.onExecuteCommand(`/deepseek-search key ${trimmed}`, currentSessionId).catch(() => {});
+      }
+      props.onExecuteCommand("/deepseek-search on", currentSessionId).catch(() => {});
+    }
+
     setIsModalOpen(false);
     restoreFocus();
   };
@@ -147,28 +171,29 @@ export function SearchButton(props: SearchButtonProps) {
           cursor: "pointer",
           userSelect: "none",
           outline: "none",
-          transition: "all 0.15s ease-in-out",
-          // 使用 DSH 官方 Design Token 变量，自适应所有主题
+          transition: "all 0.18s cubic-bezier(0.4, 0, 0.2, 1)",
+          backgroundColor: active
+            ? "var(--dsw-alias-brand-primary, #4d6bfe)"
+            : "var(--dsw-alias-interactive-bg, rgba(0, 0, 0, 0.04))",
           border: active
             ? "1px solid var(--dsw-alias-brand-primary, #4d6bfe)"
-            : "1px solid var(--dsw-alias-border-l2, rgba(140, 140, 140, 0.28))",
-          backgroundColor: active
-            ? "rgba(77, 107, 254, 0.14)"
-            : "var(--dsw-alias-interactive-bg, rgba(255, 255, 255, 0.05))",
+            : "1px solid var(--dsw-alias-border-l2, rgba(140, 140, 140, 0.25))",
           color: active
-            ? "var(--dsw-alias-brand-primary, #4d6bfe)"
-            : "var(--dsw-alias-label-secondary, #8c8c8c)",
+            ? "#ffffff"
+            : "var(--dsw-alias-label-secondary, #6b7280)",
           boxShadow: active
-            ? "0 0 8px rgba(77, 107, 254, 0.25)"
-            : "none",
+            ? "0 0 6px rgba(77, 107, 254, 0.35)"
+            : "none"
         }}
       >
         <span>联网搜索</span>
       </button>
 
-      {/* 可视化配置弹窗 */}
+      {/* API Key 可视化配置弹窗 */}
       {isModalOpen && (
         <div
+          role="dialog"
+          aria-modal="true"
           style={{
             position: "fixed",
             top: 0,
@@ -176,78 +201,82 @@ export function SearchButton(props: SearchButtonProps) {
             right: 0,
             bottom: 0,
             backgroundColor: "rgba(0, 0, 0, 0.45)",
-            backdropFilter: "blur(6px)",
-            zIndex: 99999,
+            backdropFilter: "blur(4px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: "16px"
+            zIndex: 99999
           }}
           onClick={() => setIsModalOpen(false)}
         >
           <div
             style={{
-              width: "100%",
-              maxWidth: "460px",
-              backgroundColor: "var(--dsw-alias-surface-panel, rgba(28, 28, 32, 0.95))",
-              backdropFilter: "blur(20px)",
-              color: "var(--dsw-alias-label-primary, #ffffff)",
-              border: "1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.12))",
+              width: "440px",
+              maxWidth: "92vw",
+              backgroundColor: "var(--dsw-alias-bg-elevated, #ffffff)",
+              color: "var(--dsw-alias-label-primary, #111827)",
               borderRadius: "14px",
-              boxShadow: "0 24px 48px -12px rgba(0, 0, 0, 0.5)",
-              padding: "20px 24px",
-              boxSizing: "border-box"
+              boxShadow: "0 16px 36px rgba(0, 0, 0, 0.24)",
+              padding: "24px",
+              boxSizing: "border-box",
+              border: "1px solid var(--dsw-alias-border-l1, rgba(140, 140, 140, 0.2))",
+              animation: "fadeIn 0.15s ease-out"
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 弹窗头部 */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-              <div style={{ fontSize: "15px", fontWeight: 600 }}>配置 DeepSeek 联网搜索</div>
+            {/* 标题 */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+              <div style={{ fontSize: "16px", fontWeight: 600 }}>DeepSeek 联网搜索配置</div>
               <button
                 type="button"
                 style={{
                   background: "transparent",
                   border: "none",
-                  color: "var(--dsw-alias-label-secondary, #8c8c8c)",
+                  fontSize: "18px",
                   cursor: "pointer",
-                  fontSize: "16px",
-                  lineHeight: 1,
-                  padding: "4px"
+                  color: "var(--dsw-alias-label-secondary, #8c8c8c)",
+                  padding: "4px 8px"
                 }}
                 onClick={() => setIsModalOpen(false)}
               >
-                ✕
+                ×
               </button>
             </div>
 
-            {/* 弹窗说明（不写死价格与模型，官方功能+文档链接） */}
-            <div style={{ fontSize: "12.5px", color: "var(--dsw-alias-label-secondary, #9ca3af)", lineHeight: 1.5, marginBottom: "16px" }}>
-              接入 DeepSeek 官方网页搜索 (Search) 与内容抓取 (Fetch) 能力。
-              <a
-                href="https://api-docs.deepseek.com/zh-cn/guides/search/"
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: "#4d6bfe", marginLeft: "4px", textDecoration: "none" }}
-              >
-                官方接口文档 ↗
-              </a>
+            {/* 功能说明与官方文档超链接 */}
+            <div style={{ fontSize: "13px", color: "var(--dsw-alias-label-secondary, #4b5563)", lineHeight: 1.5, marginBottom: "16px" }}>
+              使用 DeepSeek 官方联网搜索服务（Search & Fetch），为模型提供实时网页检索与抓取能力。
+              <div style={{ marginTop: "6px" }}>
+                <a
+                  href="https://api-docs.deepseek.com/"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    color: "var(--dsw-alias-brand-primary, #4d6bfe)",
+                    textDecoration: "underline",
+                    cursor: "pointer"
+                  }}
+                >
+                  查看 DeepSeek 官方 API 文档 ↗
+                </a>
+              </div>
             </div>
 
-            {/* 输入框区域 */}
-            <div style={{ marginBottom: "16px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 500, marginBottom: "6px" }}>DeepSeek API Key</div>
+            {/* 输入表单 */}
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 500, marginBottom: "6px" }}>
+                DeepSeek API Key
+              </label>
               <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
                 <input
                   type={showPassword ? "text" : "password"}
-                  placeholder="sk-..."
+                  placeholder="请输入您的 DeepSeek API Key (sk-...)"
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
                       handleSaveKey();
-                    } else if (e.key === "Escape") {
-                      setIsModalOpen(false);
                     }
                   }}
                   autoFocus
@@ -274,27 +303,27 @@ export function SearchButton(props: SearchButtonProps) {
                     border: "none",
                     color: "var(--dsw-alias-label-secondary, #8c8c8c)",
                     cursor: "pointer",
-                    fontSize: "13px",
+                    fontSize: "12px",
                     padding: "4px"
                   }}
                   onClick={() => setShowPassword(!showPassword)}
                   title={showPassword ? "隐藏" : "显示"}
                 >
-                  {showPassword ? "🙈" : "👁"}
+                  {showPassword ? "隐藏" : "显示"}
                 </button>
               </div>
             </div>
 
-            {/* 辅助隐私说明与获取链接 */}
+            {/* 隐私提示与平台入口 */}
             <div style={{ fontSize: "11.5px", color: "var(--dsw-alias-label-tertiary, #6b7280)", lineHeight: 1.4, marginBottom: "20px" }}>
-              密钥仅保存在您当前电脑本地设备。还没有 API Key？
+              API Key 仅保存在您当前电脑本地设备。尚未获取 Key？
               <a
                 href="https://platform.deepseek.com/"
                 target="_blank"
                 rel="noreferrer"
-                style={{ color: "#4d6bfe", marginLeft: "4px", textDecoration: "none" }}
+                style={{ color: "var(--dsw-alias-brand-primary, #4d6bfe)", marginLeft: "4px", textDecoration: "none" }}
               >
-                前往平台获取 ↗
+                前往平台获取 →
               </a>
             </div>
 
@@ -325,7 +354,7 @@ export function SearchButton(props: SearchButtonProps) {
                   fontSize: "12px",
                   fontWeight: 500,
                   border: "none",
-                  backgroundColor: "#4d6bfe",
+                  backgroundColor: "var(--dsw-alias-brand-primary, #4d6bfe)",
                   color: "#ffffff",
                   cursor: "pointer",
                   boxShadow: "0 2px 8px rgba(77, 107, 254, 0.35)"
@@ -343,24 +372,47 @@ export function SearchButton(props: SearchButtonProps) {
 }
 
 /**
- * DSH 客户端插件入口
+ * DSH 客户端插件入口：注册至会话输入框左侧插槽
  */
 export function apply(ctx: any) {
-  ctx.inject(["slots"], (scope: any) => {
+  ctx.inject(["slots", "remote.commands", "sessions"], (scope: any) => {
     scope.slots.inject("conversation.input.left", () =>
       scope.slots.register(
         {
           name: "conversation.input.left",
           id: "dsh-deepseek-search-toggle",
           order: 10,
-          inject: (sessionId: string) => ({ sessionId })
+          inject: (sessionId: string) => ({
+            sessionId,
+            onExecuteCommand: async (cmd: string, sid?: string) => {
+              const targetId = sid ?? sessionId;
+              if (!targetId) return;
+
+              // 优先走 remote commands 执行通道
+              const remote = (scope && scope.remote) || (ctx && ctx.remote);
+              if (remote?.commands?.execute) {
+                return remote.commands.execute(targetId, cmd, []);
+              }
+
+              // 回退走 session prompt 通道
+              const sessions = (scope && scope.sessions) || (ctx && ctx.sessions);
+              const binding = sessions && typeof sessions.binding === "function"
+                ? sessions.binding(targetId)
+                : null;
+              const session = binding && binding.session;
+              if (session) {
+                return session.prompt([{ type: "text", text: cmd }], "queue");
+              }
+              return Promise.resolve();
+            }
+          })
         },
         SearchButton
       )
     );
   });
 
-  // 拦截会话发送事件，同步开关状态与本地 API Key 给后端
+  // 拦截会话发送事件，同步状态到请求上下文（双重兜底）
   if (typeof ctx?.on === "function") {
     ctx.on("conversation/before-send", (event: any) => {
       if (!event) return;

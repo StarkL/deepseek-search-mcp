@@ -44,8 +44,8 @@ __export(index_exports, {
 });
 module.exports = __toCommonJS(index_exports);
 var import_react = __toESM(require("react"), 1);
-var name = "dsh-client-deepseek-search";
-var inject = ["slots"];
+var name = "dsh-deepseek-search";
+var inject = ["slots", "remote.commands", "sessions"];
 var STORAGE_MODE_KEY_PREFIX = "dsh.webSearchMode.";
 var STORAGE_API_KEY = "dsh_deepseek_search_api_key";
 function SearchButton(props) {
@@ -87,6 +87,10 @@ function SearchButton(props) {
         localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}global`, "false");
       } catch {
       }
+      if (props.onExecuteCommand) {
+        props.onExecuteCommand("/deepseek-search off", currentSessionId).catch(() => {
+        });
+      }
       restoreFocus();
       return;
     }
@@ -105,6 +109,10 @@ function SearchButton(props) {
       localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}${currentSessionId}`, "true");
       localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}global`, "true");
     } catch {
+    }
+    if (props.onExecuteCommand) {
+      props.onExecuteCommand("/deepseek-search on", currentSessionId).catch(() => {
+      });
     }
     restoreFocus();
   };
@@ -127,6 +135,14 @@ function SearchButton(props) {
     } catch {
     }
     setActive(true);
+    if (props.onExecuteCommand) {
+      if (trimmed) {
+        props.onExecuteCommand(`/deepseek-search key ${trimmed}`, currentSessionId).catch(() => {
+        });
+      }
+      props.onExecuteCommand("/deepseek-search on", currentSessionId).catch(() => {
+      });
+    }
     setIsModalOpen(false);
     restoreFocus();
   };
@@ -151,18 +167,19 @@ function SearchButton(props) {
         cursor: "pointer",
         userSelect: "none",
         outline: "none",
-        transition: "all 0.15s ease-in-out",
-        // 使用 DSH 官方 Design Token 变量，自适应所有主题
-        border: active ? "1px solid var(--dsw-alias-brand-primary, #4d6bfe)" : "1px solid var(--dsw-alias-border-l2, rgba(140, 140, 140, 0.28))",
-        backgroundColor: active ? "rgba(77, 107, 254, 0.14)" : "var(--dsw-alias-interactive-bg, rgba(255, 255, 255, 0.05))",
-        color: active ? "var(--dsw-alias-brand-primary, #4d6bfe)" : "var(--dsw-alias-label-secondary, #8c8c8c)",
-        boxShadow: active ? "0 0 8px rgba(77, 107, 254, 0.25)" : "none"
+        transition: "all 0.18s cubic-bezier(0.4, 0, 0.2, 1)",
+        backgroundColor: active ? "var(--dsw-alias-brand-primary, #4d6bfe)" : "var(--dsw-alias-interactive-bg, rgba(0, 0, 0, 0.04))",
+        border: active ? "1px solid var(--dsw-alias-brand-primary, #4d6bfe)" : "1px solid var(--dsw-alias-border-l2, rgba(140, 140, 140, 0.25))",
+        color: active ? "#ffffff" : "var(--dsw-alias-label-secondary, #6b7280)",
+        boxShadow: active ? "0 0 6px rgba(77, 107, 254, 0.35)" : "none"
       }
     },
     /* @__PURE__ */ import_react.default.createElement("span", null, "\u8054\u7F51\u641C\u7D22")
   ), isModalOpen && /* @__PURE__ */ import_react.default.createElement(
     "div",
     {
+      role: "dialog",
+      "aria-modal": "true",
       style: {
         position: "fixed",
         top: 0,
@@ -170,12 +187,11 @@ function SearchButton(props) {
         right: 0,
         bottom: 0,
         backgroundColor: "rgba(0, 0, 0, 0.45)",
-        backdropFilter: "blur(6px)",
-        zIndex: 99999,
+        backdropFilter: "blur(4px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "16px"
+        zIndex: 99999
       },
       onClick: () => setIsModalOpen(false)
     },
@@ -183,59 +199,60 @@ function SearchButton(props) {
       "div",
       {
         style: {
-          width: "100%",
-          maxWidth: "460px",
-          backgroundColor: "var(--dsw-alias-surface-panel, rgba(28, 28, 32, 0.95))",
-          backdropFilter: "blur(20px)",
-          color: "var(--dsw-alias-label-primary, #ffffff)",
-          border: "1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.12))",
+          width: "440px",
+          maxWidth: "92vw",
+          backgroundColor: "var(--dsw-alias-bg-elevated, #ffffff)",
+          color: "var(--dsw-alias-label-primary, #111827)",
           borderRadius: "14px",
-          boxShadow: "0 24px 48px -12px rgba(0, 0, 0, 0.5)",
-          padding: "20px 24px",
-          boxSizing: "border-box"
+          boxShadow: "0 16px 36px rgba(0, 0, 0, 0.24)",
+          padding: "24px",
+          boxSizing: "border-box",
+          border: "1px solid var(--dsw-alias-border-l1, rgba(140, 140, 140, 0.2))",
+          animation: "fadeIn 0.15s ease-out"
         },
         onClick: (e) => e.stopPropagation()
       },
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: "15px", fontWeight: 600 } }, "\u914D\u7F6E DeepSeek \u8054\u7F51\u641C\u7D22"), /* @__PURE__ */ import_react.default.createElement(
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: "16px", fontWeight: 600 } }, "DeepSeek \u8054\u7F51\u641C\u7D22\u914D\u7F6E"), /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
           type: "button",
           style: {
             background: "transparent",
             border: "none",
-            color: "var(--dsw-alias-label-secondary, #8c8c8c)",
+            fontSize: "18px",
             cursor: "pointer",
-            fontSize: "16px",
-            lineHeight: 1,
-            padding: "4px"
+            color: "var(--dsw-alias-label-secondary, #8c8c8c)",
+            padding: "4px 8px"
           },
           onClick: () => setIsModalOpen(false)
         },
-        "\u2715"
+        "\xD7"
       )),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: "12.5px", color: "var(--dsw-alias-label-secondary, #9ca3af)", lineHeight: 1.5, marginBottom: "16px" } }, "\u63A5\u5165 DeepSeek \u5B98\u65B9\u7F51\u9875\u641C\u7D22 (Search) \u4E0E\u5185\u5BB9\u6293\u53D6 (Fetch) \u80FD\u529B\u3002", /* @__PURE__ */ import_react.default.createElement(
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: "13px", color: "var(--dsw-alias-label-secondary, #4b5563)", lineHeight: 1.5, marginBottom: "16px" } }, "\u4F7F\u7528 DeepSeek \u5B98\u65B9\u8054\u7F51\u641C\u7D22\u670D\u52A1\uFF08Search & Fetch\uFF09\uFF0C\u4E3A\u6A21\u578B\u63D0\u4F9B\u5B9E\u65F6\u7F51\u9875\u68C0\u7D22\u4E0E\u6293\u53D6\u80FD\u529B\u3002", /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: "6px" } }, /* @__PURE__ */ import_react.default.createElement(
         "a",
         {
-          href: "https://api-docs.deepseek.com/zh-cn/guides/search/",
+          href: "https://api-docs.deepseek.com/",
           target: "_blank",
           rel: "noreferrer",
-          style: { color: "#4d6bfe", marginLeft: "4px", textDecoration: "none" }
+          style: {
+            color: "var(--dsw-alias-brand-primary, #4d6bfe)",
+            textDecoration: "underline",
+            cursor: "pointer"
+          }
         },
-        "\u5B98\u65B9\u63A5\u53E3\u6587\u6863 \u2197"
-      )),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: "16px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: "12px", fontWeight: 500, marginBottom: "6px" } }, "DeepSeek API Key"), /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", display: "flex", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement(
+        "\u67E5\u770B DeepSeek \u5B98\u65B9 API \u6587\u6863 \u2197"
+      ))),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: "14px" } }, /* @__PURE__ */ import_react.default.createElement("label", { style: { display: "block", fontSize: "12px", fontWeight: 500, marginBottom: "6px" } }, "DeepSeek API Key"), /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", display: "flex", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement(
         "input",
         {
           type: showPassword ? "text" : "password",
-          placeholder: "sk-...",
+          placeholder: "\u8BF7\u8F93\u5165\u60A8\u7684 DeepSeek API Key (sk-...)",
           value: apiKeyInput,
           onChange: (e) => setApiKeyInput(e.target.value),
           onKeyDown: (e) => {
             if (e.key === "Enter") {
               e.preventDefault();
               handleSaveKey();
-            } else if (e.key === "Escape") {
-              setIsModalOpen(false);
             }
           },
           autoFocus: true,
@@ -264,23 +281,23 @@ function SearchButton(props) {
             border: "none",
             color: "var(--dsw-alias-label-secondary, #8c8c8c)",
             cursor: "pointer",
-            fontSize: "13px",
+            fontSize: "12px",
             padding: "4px"
           },
           onClick: () => setShowPassword(!showPassword),
           title: showPassword ? "\u9690\u85CF" : "\u663E\u793A"
         },
-        showPassword ? "\u{1F648}" : "\u{1F441}"
+        showPassword ? "\u9690\u85CF" : "\u663E\u793A"
       ))),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: "11.5px", color: "var(--dsw-alias-label-tertiary, #6b7280)", lineHeight: 1.4, marginBottom: "20px" } }, "\u5BC6\u94A5\u4EC5\u4FDD\u5B58\u5728\u60A8\u5F53\u524D\u7535\u8111\u672C\u5730\u8BBE\u5907\u3002\u8FD8\u6CA1\u6709 API Key\uFF1F", /* @__PURE__ */ import_react.default.createElement(
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: "11.5px", color: "var(--dsw-alias-label-tertiary, #6b7280)", lineHeight: 1.4, marginBottom: "20px" } }, "API Key \u4EC5\u4FDD\u5B58\u5728\u60A8\u5F53\u524D\u7535\u8111\u672C\u5730\u8BBE\u5907\u3002\u5C1A\u672A\u83B7\u53D6 Key\uFF1F", /* @__PURE__ */ import_react.default.createElement(
         "a",
         {
           href: "https://platform.deepseek.com/",
           target: "_blank",
           rel: "noreferrer",
-          style: { color: "#4d6bfe", marginLeft: "4px", textDecoration: "none" }
+          style: { color: "var(--dsw-alias-brand-primary, #4d6bfe)", marginLeft: "4px", textDecoration: "none" }
         },
-        "\u524D\u5F80\u5E73\u53F0\u83B7\u53D6 \u2197"
+        "\u524D\u5F80\u5E73\u53F0\u83B7\u53D6 \u2192"
       )),
       /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: "10px" } }, /* @__PURE__ */ import_react.default.createElement(
         "button",
@@ -310,7 +327,7 @@ function SearchButton(props) {
             fontSize: "12px",
             fontWeight: 500,
             border: "none",
-            backgroundColor: "#4d6bfe",
+            backgroundColor: "var(--dsw-alias-brand-primary, #4d6bfe)",
             color: "#ffffff",
             cursor: "pointer",
             boxShadow: "0 2px 8px rgba(77, 107, 254, 0.35)"
@@ -323,7 +340,7 @@ function SearchButton(props) {
   ));
 }
 function apply(ctx) {
-  ctx.inject(["slots"], (scope) => {
+  ctx.inject(["slots", "remote.commands", "sessions"], (scope) => {
     scope.slots.inject(
       "conversation.input.left",
       () => scope.slots.register(
@@ -331,7 +348,24 @@ function apply(ctx) {
           name: "conversation.input.left",
           id: "dsh-deepseek-search-toggle",
           order: 10,
-          inject: (sessionId) => ({ sessionId })
+          inject: (sessionId) => ({
+            sessionId,
+            onExecuteCommand: async (cmd, sid) => {
+              const targetId = sid ?? sessionId;
+              if (!targetId) return;
+              const remote = scope && scope.remote || ctx && ctx.remote;
+              if (remote?.commands?.execute) {
+                return remote.commands.execute(targetId, cmd, []);
+              }
+              const sessions = scope && scope.sessions || ctx && ctx.sessions;
+              const binding = sessions && typeof sessions.binding === "function" ? sessions.binding(targetId) : null;
+              const session = binding && binding.session;
+              if (session) {
+                return session.prompt([{ type: "text", text: cmd }], "queue");
+              }
+              return Promise.resolve();
+            }
+          })
         },
         SearchButton
       )
