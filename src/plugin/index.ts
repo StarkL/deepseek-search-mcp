@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { resolveDeepSeekApiKey } from "../client.js";
 import type { PluginConfig, McpStatusResponse, EnsureStartedResult } from "./types.js";
 
 export const name = "dsh-deepseek-search";
@@ -11,6 +12,7 @@ export function apply(ctx: any, config: PluginConfig = {}) {
   let mcpFork: any = null;
   let isStarting = false;
   let lastUsedTime = Date.now();
+  let currentActiveKey = "";
 
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
@@ -24,20 +26,25 @@ export function apply(ctx: any, config: PluginConfig = {}) {
   };
 
   /**
-   * 确保 MCP 已经启动：未启动则按需拉起并握手
+   * 确保 MCP 已经启动：支持多级 API Key 自动寻址与热切换
    */
-  const ensureStarted = async (): Promise<EnsureStartedResult> => {
+  const ensureStarted = async (explicitApiKey?: string): Promise<EnsureStartedResult> => {
     lastUsedTime = Date.now();
 
-    // 1. 优先校验 API Key
-    const apiKey = process.env.DEEPSEEK_API_KEY;
+    // 多级解析 API Key: 前端传入 > 环境变量 > ~/.dsh/.credentials.yaml 兜底
+    const apiKey = resolveDeepSeekApiKey(explicitApiKey || (config as any).apiKey);
     if (!apiKey || apiKey.trim() === "") {
-      throw new Error("未检测到 DEEPSEEK_API_KEY！请在系统环境变量或 DSH 设置中配置您的 DeepSeek API Key。");
+      throw new Error("未检测到有效的 DeepSeek API Key！请点击按钮配置，或在系统环境变量中设置。");
     }
 
-    // 2. 如果已经在运行，直接复用
-    if (isMcpRunning()) {
+    // 如果已经在运行且 Key 一致，直接复用
+    if (isMcpRunning() && currentActiveKey === apiKey) {
       return { success: true, message: "MCP 搜索服务已在运行中。" };
+    }
+
+    // 如果 Key 发生变化，重启服务以应用新 Key
+    if (isMcpRunning() && currentActiveKey !== apiKey) {
+      await stopMcp();
     }
 
     if (isStarting) {
@@ -46,8 +53,9 @@ export function apply(ctx: any, config: PluginConfig = {}) {
 
     try {
       isStarting = true;
+      currentActiveKey = apiKey;
 
-      // 3. 动态加载 @deepseek-ai/dsh-mcp-client 并建立 stdio 链接
+      // 动态加载 @deepseek-ai/dsh-mcp-client 并建立 stdio 链接
       mcpFork = ctx.plugin("@deepseek-ai/dsh-mcp-client", {
         serverName,
         transport: "stdio",
@@ -59,7 +67,6 @@ export function apply(ctx: any, config: PluginConfig = {}) {
         }
       });
 
-      // 给予子进程轻量握手时间
       if (typeof ctx.sleep === "function") {
         await ctx.sleep(250);
       } else {
@@ -72,6 +79,7 @@ export function apply(ctx: any, config: PluginConfig = {}) {
         mcpFork.dispose();
       }
       mcpFork = null;
+      currentActiveKey = "";
       throw new Error(`启动 DeepSeek Search MCP 失败: ${error?.message || String(error)}`);
     } finally {
       isStarting = false;
@@ -86,6 +94,7 @@ export function apply(ctx: any, config: PluginConfig = {}) {
       mcpFork.dispose();
     }
     mcpFork = null;
+    currentActiveKey = "";
   };
 
   /**
@@ -94,27 +103,27 @@ export function apply(ctx: any, config: PluginConfig = {}) {
   const searchService = {
     getStatus: async (): Promise<McpStatusResponse> => ({
       running: isMcpRunning(),
-      hasApiKey: Boolean(process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.trim() !== ""),
+      hasApiKey: Boolean(resolveDeepSeekApiKey((config as any).apiKey)),
       serverName
     }),
-    ensureStarted,
+    ensureStarted: (explicitKey?: string) => ensureStarted(explicitKey),
     stop: stopMcp
   };
 
-  // 1. 注册为 Cordis 服务（无需外部 inject，原生注入能力）
+  // 1. 注册为 Cordis 服务
   try {
     if (typeof ctx.provide === "function") {
       ctx.provide("deepseekSearchService", searchService);
     }
   } catch {}
 
-  // 2. 原生 Cordis 事件总线监听（零服务依赖、100% 绝对安全）
+  // 2. 原生 Cordis 事件总线监听
   ctx.on("deepseekSearch/getStatus", searchService.getStatus);
-  ctx.on("deepseekSearch/ensureStarted", searchService.ensureStarted);
+  ctx.on("deepseekSearch/ensureStarted", (key?: string) => ensureStarted(key));
   ctx.on("deepseekSearch/stop", searchService.stop);
 
   /**
-   * 拦截 Agent 对话生命周期：按需过滤/注入工具
+   * 拦截 Agent 对话生命周期：按需过滤/注入工具并自动按需启动
    */
   ctx.on("agent/before-chat", async (session: any) => {
     const isSearchActive = session?.options?.enableDeepSeekSearch ?? defaultEnabled;
@@ -130,10 +139,17 @@ export function apply(ctx: any, config: PluginConfig = {}) {
         return !toolName.includes("deepseek_search") && !toolName.includes("deepseek_fetch");
       });
     } else {
-      // 亮起状态：记录活跃时间
+      // 亮起状态：确保后台 MCP 已启动
+      const userKey = session?.options?.deepseekApiKey;
+      try {
+        await ensureStarted(userKey);
+      } catch (e) {
+        console.error("[dsh-deepseek-search] ensureStarted error:", e);
+      }
+
       lastUsedTime = Date.now();
 
-      // 在 System Prompt 中注入联网搜索提示词，激活意图
+      // 在 System Prompt 中注入联网搜索提示词
       const searchPrompt = "\n[联网检索已就绪]: 当前会话已开启 DeepSeek 实时网页搜索与抓取能力。如需最新资讯、外部链接分析或查证事实，请按需调用 search 或 fetch 工具。";
       if (typeof session.systemPrompt === "string") {
         if (!session.systemPrompt.includes("联网检索已就绪")) {

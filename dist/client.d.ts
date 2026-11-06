@@ -1,4 +1,11 @@
 import { DeepSeekSearchRequest, DeepSeekSearchResponse, DeepSeekFetchRequest, DeepSeekFetchResponse } from "./types.js";
+/**
+ * 智能按优先级解析有效的 DeepSeek API Key:
+ * 1. 显式传入 (代码/前端会话)
+ * 2. 环境变量 DEEPSEEK_API_KEY
+ * 3. 终极兜底：自动探测读取 ~/.dsh/.credentials.yaml
+ */
+export declare function resolveDeepSeekApiKey(explicitKey?: string): string;
 export declare class DeepSeekApiClient {
     private apiKey;
     private baseUrl;

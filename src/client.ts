@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 import {
   DeepSeekSearchRequest,
   DeepSeekSearchResponse,
@@ -6,12 +9,41 @@ import {
   DeepSeekApiError
 } from "./types.js";
 
+/**
+ * 智能按优先级解析有效的 DeepSeek API Key:
+ * 1. 显式传入 (代码/前端会话)
+ * 2. 环境变量 DEEPSEEK_API_KEY
+ * 3. 终极兜底：自动探测读取 ~/.dsh/.credentials.yaml
+ */
+export function resolveDeepSeekApiKey(explicitKey?: string): string {
+  if (explicitKey && explicitKey.trim()) {
+    return explicitKey.trim();
+  }
+  if (process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.trim()) {
+    return process.env.DEEPSEEK_API_KEY.trim();
+  }
+  try {
+    const credPath = path.join(os.homedir(), ".dsh/.credentials.yaml");
+    if (fs.existsSync(credPath)) {
+      const content = fs.readFileSync(credPath, "utf8");
+      const match = content.match(/DEEPSEEK_API_KEY:\s*([^\r\n]+)/);
+      if (match && match[1]) {
+        const key = match[1].trim().replace(/^['"]|['"]$/g, "");
+        if (key && key.startsWith("sk-")) {
+          return key;
+        }
+      }
+    }
+  } catch {}
+  return "";
+}
+
 export class DeepSeekApiClient {
   private apiKey: string;
   private baseUrl: string;
 
   constructor(apiKey?: string, baseUrl?: string) {
-    this.apiKey = apiKey || process.env.DEEPSEEK_API_KEY || "";
+    this.apiKey = resolveDeepSeekApiKey(apiKey);
     this.baseUrl = (baseUrl || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, "");
 
     if (!this.apiKey) {
@@ -91,8 +123,11 @@ export class DeepSeekApiClient {
 
   private ensureApiKey() {
     if (!this.apiKey) {
+      this.apiKey = resolveDeepSeekApiKey();
+    }
+    if (!this.apiKey) {
       throw new Error(
-        "Missing DeepSeek API Key. Please configure the DEEPSEEK_API_KEY environment variable in your MCP client settings."
+        "Missing DeepSeek API Key. Please configure your DeepSeek API Key in the UI settings or DEEPSEEK_API_KEY environment variable."
       );
     }
   }
