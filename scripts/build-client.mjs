@@ -25,7 +25,7 @@ const footer = [
 
 await esbuild.build({
   entryPoints: [path.join(root, 'src/client-ui/index.tsx')],
-  outfile: path.join(root, 'dist/client.js'),
+  outfile: path.join(root, 'dist/client-ui.js'),
   bundle: true,
   format: 'cjs',
   platform: 'browser',
@@ -47,4 +47,4 @@ await esbuild.build({
   footer: { js: footer }
 });
 
-console.log('[build-client] dist/client.js compiled with esbuild successfully.');
+console.log('[build-client] dist/client-ui.js compiled with esbuild successfully.');

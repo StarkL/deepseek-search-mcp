@@ -1,397 +1,196 @@
-(function() {
-  var __load__ = (typeof window !== "undefined" && window.__ModuleLoader__ && typeof window.__ModuleLoader__.load === "function")
-    ? window.__ModuleLoader__.load.bind(window.__ModuleLoader__)
-    : function(opts) { if (opts && opts.factory) { try { opts.factory(function() { return {}; }); } catch(e) { console.error(e); } } };
-  __load__({ id: "dsh-deepseek-search", factory: (require) => {
-  var module = { exports: {} }; var exports = module.exports;
-"use strict";
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name2 in all)
-    __defProp(target, name2, { get: all[name2], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-
-// src/client-ui/index.tsx
-var index_exports = {};
-__export(index_exports, {
-  SearchButton: () => SearchButton,
-  apply: () => apply,
-  default: () => index_default,
-  inject: () => inject,
-  name: () => name
-});
-module.exports = __toCommonJS(index_exports);
-var import_react = __toESM(require("react"), 1);
-var name = "dsh-deepseek-search";
-var inject = ["slots", "remote.commands", "sessions"];
-var STORAGE_MODE_KEY_PREFIX = "dsh.webSearchMode.";
-var STORAGE_API_KEY = "dsh_deepseek_search_api_key";
-function SearchButton(props) {
-  const sessionObj = props.session ?? props.zone?.session;
-  const currentSessionId = sessionObj?.sessionId ?? props.sessionId ?? "default";
-  const [active, setActive] = (0, import_react.useState)(() => {
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+/**
+ * 智能按优先级解析有效的 DeepSeek API Key:
+ * 1. 显式传入 (代码/前端会话)
+ * 2. 环境变量 DEEPSEEK_API_KEY
+ * 3. 终极兜底：自动探测读取 ~/.dsh/.credentials.yaml
+ */
+export function resolveDeepSeekApiKey(explicitKey) {
+    if (explicitKey && explicitKey.trim()) {
+        return explicitKey.trim();
+    }
+    if (process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.trim()) {
+        return process.env.DEEPSEEK_API_KEY.trim();
+    }
     try {
-      return localStorage.getItem(`${STORAGE_MODE_KEY_PREFIX}${currentSessionId}`) === "true";
-    } catch {
-      return false;
-    }
-  });
-  const [isModalOpen, setIsModalOpen] = (0, import_react.useState)(false);
-  const [apiKeyInput, setApiKeyInput] = (0, import_react.useState)("");
-  const [showPassword, setShowPassword] = (0, import_react.useState)(false);
-  (0, import_react.useEffect)(() => {
-    if (!currentSessionId) return;
-    try {
-      const stored = localStorage.getItem(`${STORAGE_MODE_KEY_PREFIX}${currentSessionId}`) === "true";
-      setActive(stored);
-    } catch {
-    }
-  }, [currentSessionId]);
-  const restoreFocus = () => {
-    setTimeout(() => {
-      const editor = document.querySelector('[contenteditable="true"]') || document.querySelector("textarea");
-      if (editor) {
-        editor.focus();
-      }
-    }, 20);
-  };
-  const handleClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (active) {
-      setActive(false);
-      try {
-        localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}${currentSessionId}`, "false");
-        localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}global`, "false");
-      } catch {
-      }
-      if (props.onExecuteCommand) {
-        props.onExecuteCommand("/deepseek-search off", currentSessionId).catch(() => {
-        });
-      }
-      restoreFocus();
-      return;
-    }
-    let savedKey = "";
-    try {
-      savedKey = localStorage.getItem(STORAGE_API_KEY) || "";
-    } catch {
-    }
-    if (!savedKey.trim()) {
-      setApiKeyInput("");
-      setIsModalOpen(true);
-      return;
-    }
-    setActive(true);
-    try {
-      localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}${currentSessionId}`, "true");
-      localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}global`, "true");
-    } catch {
-    }
-    if (props.onExecuteCommand) {
-      props.onExecuteCommand("/deepseek-search on", currentSessionId).catch(() => {
-      });
-    }
-    restoreFocus();
-  };
-  const handleContextMenu = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    try {
-      const existing = localStorage.getItem(STORAGE_API_KEY) || "";
-      setApiKeyInput(existing);
-    } catch {
-    }
-    setIsModalOpen(true);
-  };
-  const handleSaveKey = () => {
-    const trimmed = apiKeyInput.trim();
-    try {
-      localStorage.setItem(STORAGE_API_KEY, trimmed);
-      localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}${currentSessionId}`, "true");
-      localStorage.setItem(`${STORAGE_MODE_KEY_PREFIX}global`, "true");
-    } catch {
-    }
-    setActive(true);
-    if (props.onExecuteCommand) {
-      if (trimmed) {
-        props.onExecuteCommand(`/deepseek-search key ${trimmed}`, currentSessionId).catch(() => {
-        });
-      }
-      props.onExecuteCommand("/deepseek-search on", currentSessionId).catch(() => {
-      });
-    }
-    setIsModalOpen(false);
-    restoreFocus();
-  };
-  return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement(
-    "button",
-    {
-      type: "button",
-      className: `dsh-search-toggle-btn ${active ? "active" : ""}`,
-      title: active ? "\u8054\u7F51\u641C\u7D22\u5DF2\u5F00\u542F\uFF08\u5E38\u4EAE\uFF09\uFF1A\u70B9\u51FB\u53D8\u6697\u5173\u95ED\uFF0C\u53F3\u952E\u53EF\u4FEE\u6539\u914D\u7F6E" : "\u8054\u7F51\u641C\u7D22\u5DF2\u5173\u95ED\uFF08\u53D8\u6697\uFF09\uFF1A\u70B9\u51FB\u70B9\u4EAE\u5F00\u542F\uFF0C\u53F3\u952E\u53EF\u914D\u7F6E API Key",
-      onClick: handleClick,
-      onContextMenu: handleContextMenu,
-      style: {
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        height: "26px",
-        padding: "0 12px",
-        borderRadius: "13px",
-        fontSize: "12px",
-        lineHeight: "20px",
-        fontWeight: active ? 600 : 500,
-        cursor: "pointer",
-        userSelect: "none",
-        outline: "none",
-        transition: "all 0.18s cubic-bezier(0.4, 0, 0.2, 1)",
-        backgroundColor: active ? "var(--dsw-alias-brand-primary, #4d6bfe)" : "var(--dsw-alias-interactive-bg, rgba(0, 0, 0, 0.04))",
-        border: active ? "1px solid var(--dsw-alias-brand-primary, #4d6bfe)" : "1px solid var(--dsw-alias-border-l2, rgba(140, 140, 140, 0.25))",
-        color: active ? "#ffffff" : "var(--dsw-alias-label-secondary, #6b7280)",
-        boxShadow: active ? "0 0 6px rgba(77, 107, 254, 0.35)" : "none"
-      }
-    },
-    /* @__PURE__ */ import_react.default.createElement("span", null, "\u8054\u7F51\u641C\u7D22")
-  ), isModalOpen && /* @__PURE__ */ import_react.default.createElement(
-    "div",
-    {
-      role: "dialog",
-      "aria-modal": "true",
-      style: {
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.45)",
-        backdropFilter: "blur(4px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 99999
-      },
-      onClick: () => setIsModalOpen(false)
-    },
-    /* @__PURE__ */ import_react.default.createElement(
-      "div",
-      {
-        style: {
-          width: "440px",
-          maxWidth: "92vw",
-          backgroundColor: "var(--dsw-alias-bg-elevated, #ffffff)",
-          color: "var(--dsw-alias-label-primary, #111827)",
-          borderRadius: "14px",
-          boxShadow: "0 16px 36px rgba(0, 0, 0, 0.24)",
-          padding: "24px",
-          boxSizing: "border-box",
-          border: "1px solid var(--dsw-alias-border-l1, rgba(140, 140, 140, 0.2))",
-          animation: "fadeIn 0.15s ease-out"
-        },
-        onClick: (e) => e.stopPropagation()
-      },
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: "16px", fontWeight: 600 } }, "DeepSeek \u8054\u7F51\u641C\u7D22\u914D\u7F6E"), /* @__PURE__ */ import_react.default.createElement(
-        "button",
-        {
-          type: "button",
-          style: {
-            background: "transparent",
-            border: "none",
-            fontSize: "18px",
-            cursor: "pointer",
-            color: "var(--dsw-alias-label-secondary, #8c8c8c)",
-            padding: "4px 8px"
-          },
-          onClick: () => setIsModalOpen(false)
-        },
-        "\xD7"
-      )),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: "13px", color: "var(--dsw-alias-label-secondary, #4b5563)", lineHeight: 1.5, marginBottom: "16px" } }, "\u4F7F\u7528 DeepSeek \u5B98\u65B9\u8054\u7F51\u641C\u7D22\u670D\u52A1\uFF08Search & Fetch\uFF09\uFF0C\u4E3A\u6A21\u578B\u63D0\u4F9B\u5B9E\u65F6\u7F51\u9875\u68C0\u7D22\u4E0E\u6293\u53D6\u80FD\u529B\u3002", /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: "6px" } }, /* @__PURE__ */ import_react.default.createElement(
-        "a",
-        {
-          href: "https://api-docs.deepseek.com/",
-          target: "_blank",
-          rel: "noreferrer",
-          style: {
-            color: "var(--dsw-alias-brand-primary, #4d6bfe)",
-            textDecoration: "underline",
-            cursor: "pointer"
-          }
-        },
-        "\u67E5\u770B DeepSeek \u5B98\u65B9 API \u6587\u6863 \u2197"
-      ))),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: "14px" } }, /* @__PURE__ */ import_react.default.createElement("label", { style: { display: "block", fontSize: "12px", fontWeight: 500, marginBottom: "6px" } }, "DeepSeek API Key"), /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", display: "flex", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement(
-        "input",
-        {
-          type: showPassword ? "text" : "password",
-          placeholder: "\u8BF7\u8F93\u5165\u60A8\u7684 DeepSeek API Key (sk-...)",
-          value: apiKeyInput,
-          onChange: (e) => setApiKeyInput(e.target.value),
-          onKeyDown: (e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleSaveKey();
+        const credPath = path.join(os.homedir(), ".dsh/.credentials.yaml");
+        if (fs.existsSync(credPath)) {
+            const content = fs.readFileSync(credPath, "utf8");
+            const match = content.match(/DEEPSEEK_API_KEY:\s*([^\r\n]+)/);
+            if (match && match[1]) {
+                const key = match[1].trim().replace(/^['"]|['"]$/g, "");
+                if (key && key.startsWith("sk-")) {
+                    return key;
+                }
             }
-          },
-          autoFocus: true,
-          style: {
-            width: "100%",
-            height: "36px",
-            padding: "0 38px 0 10px",
-            borderRadius: "8px",
-            border: "1px solid var(--dsw-alias-border-l1, rgba(140, 140, 140, 0.35))",
-            backgroundColor: "var(--dsw-alias-interactive-bg, rgba(255, 255, 255, 0.04))",
-            color: "inherit",
-            fontSize: "13px",
-            outline: "none",
-            boxSizing: "border-box",
-            fontFamily: "monospace"
-          }
         }
-      ), /* @__PURE__ */ import_react.default.createElement(
-        "button",
-        {
-          type: "button",
-          style: {
-            position: "absolute",
-            right: "8px",
-            background: "transparent",
-            border: "none",
-            color: "var(--dsw-alias-label-secondary, #8c8c8c)",
-            cursor: "pointer",
-            fontSize: "12px",
-            padding: "4px"
-          },
-          onClick: () => setShowPassword(!showPassword),
-          title: showPassword ? "\u9690\u85CF" : "\u663E\u793A"
-        },
-        showPassword ? "\u9690\u85CF" : "\u663E\u793A"
-      ))),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: "11.5px", color: "var(--dsw-alias-label-tertiary, #6b7280)", lineHeight: 1.4, marginBottom: "20px" } }, "API Key \u4EC5\u4FDD\u5B58\u5728\u60A8\u5F53\u524D\u7535\u8111\u672C\u5730\u8BBE\u5907\u3002\u5C1A\u672A\u83B7\u53D6 Key\uFF1F", /* @__PURE__ */ import_react.default.createElement(
-        "a",
-        {
-          href: "https://platform.deepseek.com/",
-          target: "_blank",
-          rel: "noreferrer",
-          style: { color: "var(--dsw-alias-brand-primary, #4d6bfe)", marginLeft: "4px", textDecoration: "none" }
-        },
-        "\u524D\u5F80\u5E73\u53F0\u83B7\u53D6 \u2192"
-      )),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: "10px" } }, /* @__PURE__ */ import_react.default.createElement(
-        "button",
-        {
-          type: "button",
-          style: {
-            height: "32px",
-            padding: "0 14px",
-            borderRadius: "8px",
-            fontSize: "12px",
-            border: "1px solid var(--dsw-alias-border-l2, rgba(140, 140, 140, 0.3))",
-            backgroundColor: "transparent",
-            color: "var(--dsw-alias-label-secondary, #9ca3af)",
-            cursor: "pointer"
-          },
-          onClick: () => setIsModalOpen(false)
-        },
-        "\u53D6\u6D88"
-      ), /* @__PURE__ */ import_react.default.createElement(
-        "button",
-        {
-          type: "button",
-          style: {
-            height: "32px",
-            padding: "0 16px",
-            borderRadius: "8px",
-            fontSize: "12px",
-            fontWeight: 500,
-            border: "none",
-            backgroundColor: "var(--dsw-alias-brand-primary, #4d6bfe)",
-            color: "#ffffff",
-            cursor: "pointer",
-            boxShadow: "0 2px 8px rgba(77, 107, 254, 0.35)"
-          },
-          onClick: handleSaveKey
-        },
-        "\u4FDD\u5B58\u5E76\u5F00\u542F"
-      ))
-    )
-  ));
+    }
+    catch { }
+    return "";
 }
-function apply(ctx) {
-  ctx.inject(["slots", "remote.commands", "sessions"], (scope) => {
-    scope.slots.inject(
-      "conversation.input.left",
-      () => scope.slots.register(
-        {
-          name: "conversation.input.left",
-          id: "dsh-deepseek-search-toggle",
-          order: 10,
-          inject: (sessionId) => ({
-            sessionId,
-            onExecuteCommand: async (cmd, sid) => {
-              const targetId = sid ?? sessionId;
-              if (!targetId) return;
-              const remote = scope && scope.remote || ctx && ctx.remote;
-              if (remote?.commands?.execute) {
-                return remote.commands.execute(targetId, cmd, []);
-              }
-              const sessions = scope && scope.sessions || ctx && ctx.sessions;
-              const binding = sessions && typeof sessions.binding === "function" ? sessions.binding(targetId) : null;
-              const session = binding && binding.session;
-              if (session) {
-                return session.prompt([{ type: "text", text: cmd }], "queue");
-              }
-              return Promise.resolve();
+export class DeepSeekApiClient {
+    apiKey;
+    baseUrl;
+    constructor(apiKey, baseUrl) {
+        this.apiKey = resolveDeepSeekApiKey(apiKey);
+        this.baseUrl = (baseUrl || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, "");
+        if (!this.apiKey) {
+            console.error("[DeepSeekApiClient] WARNING: DEEPSEEK_API_KEY is not set. Requests will fail until configured.");
+        }
+    }
+    /**
+     * 执行网页搜索 (POST /v1/tools/search)
+     */
+    async search(params) {
+        this.ensureApiKey();
+        // 官方约束：query 必须 1~128 字符且非空
+        let cleanQuery = (params.query || "").trim();
+        if (!cleanQuery) {
+            throw new Error("Query cannot be empty.");
+        }
+        if (cleanQuery.length > 128) {
+            console.error(`[DeepSeekApiClient] Query exceeds 128 characters (${cleanQuery.length}), auto-truncating.`);
+            cleanQuery = cleanQuery.slice(0, 128);
+        }
+        // ori_question 限制 1~128 字符
+        let cleanOriQuestion = params.ori_question ? params.ori_question.trim() : null;
+        if (cleanOriQuestion && cleanOriQuestion.length > 128) {
+            cleanOriQuestion = cleanOriQuestion.slice(0, 128);
+        }
+        // count 范围 1~50
+        const count = Math.min(Math.max(params.count ?? 10, 1), 50);
+        const payload = {
+            query: cleanQuery,
+            count,
+            need_content: params.need_content ?? false,
+            ori_question: cleanOriQuestion || null,
+            localization: params.localization || ""
+        };
+        const endpoint = `${this.baseUrl}/v1/tools/search`;
+        return this.postWithRetry(endpoint, payload);
+    }
+    /**
+     * 执行单个网页抓取并转 Markdown (POST /v1/tools/fetch)
+     */
+    async fetch(params) {
+        this.ensureApiKey();
+        const cleanUrl = (params.url || "").trim();
+        if (!cleanUrl) {
+            throw new Error("URL cannot be empty.");
+        }
+        if (cleanUrl.length > 8192) {
+            throw new Error(`URL length (${cleanUrl.length}) exceeds maximum limit of 8192 characters.`);
+        }
+        // 校验 URL 合法性
+        let parsed;
+        try {
+            parsed = new URL(cleanUrl);
+            if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+                throw new Error("URL protocol must be HTTP or HTTPS.");
             }
-          })
-        },
-        SearchButton
-      )
-    );
-  });
-  if (typeof ctx?.on === "function") {
-    ctx.on("conversation/before-send", (event) => {
-      if (!event) return;
-      event.options = event.options || {};
-      const activeId = event.session?.sessionId || event.sessionId;
-      let isSearchOn = false;
-      let userKey = "";
-      try {
-        isSearchOn = activeId ? localStorage.getItem(`${STORAGE_MODE_KEY_PREFIX}${activeId}`) === "true" : localStorage.getItem(`${STORAGE_MODE_KEY_PREFIX}global`) === "true";
-        userKey = localStorage.getItem(STORAGE_API_KEY) || "";
-      } catch {
-        isSearchOn = false;
-      }
-      event.options.enableDeepSeekSearch = isSearchOn;
-      if (userKey) {
-        event.options.deepseekApiKey = userKey;
-      }
-    });
-  }
+            if (parsed.username || parsed.password) {
+                throw new Error("URL must not contain username or password credentials.");
+            }
+        }
+        catch (e) {
+            throw new Error(`Invalid URL format: ${e.message}`);
+        }
+        const payload = { url: cleanUrl };
+        const endpoint = `${this.baseUrl}/v1/tools/fetch`;
+        return this.postWithRetry(endpoint, payload);
+    }
+    ensureApiKey() {
+        if (!this.apiKey) {
+            this.apiKey = resolveDeepSeekApiKey();
+        }
+        if (!this.apiKey) {
+            throw new Error("Missing DeepSeek API Key. Please configure your DeepSeek API Key in the UI settings or DEEPSEEK_API_KEY environment variable.");
+        }
+    }
+    /**
+     * 带智能退避重试的 POST 请求
+     * 仅针对 408, 429, 5xx 错误自动重试
+     */
+    async postWithRetry(url, body, maxRetries = 3) {
+        let attempt = 0;
+        let delay = 600; // 初始退避毫秒数
+        while (attempt <= maxRetries) {
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${this.apiKey}`,
+                        "User-Agent": "deepseek-search-mcp/1.0.0"
+                    },
+                    body: JSON.stringify(body)
+                });
+                if (response.ok) {
+                    return (await response.json());
+                }
+                const statusCode = response.status;
+                let errorData = null;
+                try {
+                    errorData = (await response.json());
+                }
+                catch {
+                    // 非 JSON 格式错误响应
+                }
+                const errorMessage = errorData?.error?.message || response.statusText || `HTTP ${statusCode}`;
+                // 401 密钥失效
+                if (statusCode === 401) {
+                    throw new Error(`DeepSeek API Key is invalid or expired (HTTP 401): ${errorMessage}. Please check your DEEPSEEK_API_KEY.`);
+                }
+                // 402 余额不足
+                if (statusCode === 402) {
+                    throw new Error(`DeepSeek API account balance is insufficient (HTTP 402): ${errorMessage}. Please top up your balance at https://platform.deepseek.com.`);
+                }
+                // 403 安全策略拒绝
+                if (statusCode === 403) {
+                    throw new Error(`Request rejected by DeepSeek security policy (HTTP 403): ${errorMessage}.`);
+                }
+                // 404 Fetch 网页未获取到内容
+                if (statusCode === 404) {
+                    const err = new Error(`Page content could not be retrieved (HTTP 404): ${errorMessage}`);
+                    err.isFetchNotFound = true;
+                    throw err;
+                }
+                // 400 / 413 等不可重试错误
+                const isRetryable = [408, 429, 500, 502, 503, 504].includes(statusCode);
+                if (!isRetryable || attempt >= maxRetries) {
+                    throw new Error(`DeepSeek API request failed with status ${statusCode}: ${errorMessage}`);
+                }
+                // 触发退避重试（带少量随机抖动 jitter）
+                attempt++;
+                const jitter = Math.floor(Math.random() * 200);
+                const waitMs = delay + jitter;
+                console.error(`[DeepSeekApiClient] Request returned ${statusCode} (${errorMessage}). Retrying attempt ${attempt}/${maxRetries} after ${waitMs}ms...`);
+                await new Promise((res) => setTimeout(res, waitMs));
+                delay *= 2; // 指数退避
+            }
+            catch (err) {
+                // 如果是已被抛出的不可重试业务异常，直接向上传递
+                if (err.message?.includes("HTTP 401") ||
+                    err.message?.includes("HTTP 402") ||
+                    err.message?.includes("HTTP 403") ||
+                    err.isFetchNotFound ||
+                    err.message?.includes("HTTP 400") ||
+                    err.message?.includes("HTTP 413")) {
+                    throw err;
+                }
+                // 网络断开等底层错误重试
+                if (attempt >= maxRetries) {
+                    throw err;
+                }
+                attempt++;
+                const waitMs = delay;
+                console.error(`[DeepSeekApiClient] Network error: ${err.message}. Retrying attempt ${attempt}/${maxRetries}...`);
+                await new Promise((res) => setTimeout(res, waitMs));
+                delay *= 2;
+            }
+        }
+        throw new Error(`Request failed after ${maxRetries} retry attempts.`);
+    }
 }
-var index_default = apply;
-  return module.exports;
-  } });
-})();
